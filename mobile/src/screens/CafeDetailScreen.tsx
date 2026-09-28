@@ -13,11 +13,12 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-
 import { RootStackParamlist } from '../navigation/AppNavigator';
 import { getCafeDetails } from '../services/api';
 import { CafeDetail } from '../types/CafeDetail';
 import { priceLabels } from '../utils/price';
+import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'CafeDetail'>;
 
@@ -25,14 +26,13 @@ export default function CafeDetailScreen({ route, navigation }: Props)
 {
     const { googlePlaceId } = route.params;
 
-    const [cafe, setCafe] =
-        useState<CafeDetail | null>(null);
+    const { isAuthenticated } = useAuth();
 
-    const [loading, setLoading] =
-        useState(true);
+    const { isFavorite, toggleFavorite } = useFavorites();
 
-    const [error, setError] =
-        useState<string | null>(null);
+    const [cafe, setCafe] = useState<CafeDetail | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useFocusEffect(
         useCallback(() => {
@@ -116,15 +116,46 @@ export default function CafeDetailScreen({ route, navigation }: Props)
         );
     };
 
+    const handleFavoritePress = async () => {
+        if (!isAuthenticated)
+        {
+            navigation.navigate('Login');
+            return;
+        }
+
+        try
+        {
+            await toggleFavorite(cafe);
+        }
+        catch (error)
+        {
+            console.error('Error al actualizar favorito', error);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.title}>
-                    {cafe.name}
-                </Text>
+                <View style={styles.titleRow}>
+                    <Text style={styles.title}>
+                        {cafe.name}
+                    </Text>
+
+                    <TouchableOpacity
+                        style={styles.favoriteIconButton}
+                        onPress={handleFavoritePress}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.favoriteIcon}>
+                            {isFavorite(cafe.googlePlaceId)
+                                ? '♥'
+                                : '♡'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
 
                 <View style={styles.ratingsContainer}>
                     <View>
@@ -201,10 +232,10 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                         </Text>
                     )}
 
-                    <Text style={styles.info}>
+                    <Text style={styles.infoAddress}>
                         📍 {addressLabel}
                     </Text>
-                    <Text style={styles.info}>
+                    <Text style={styles.infoPets}>
                         {cafe.allowsDogs === true
                             ? '🐕 Acepta mascotas'
                             : cafe.allowsDogs === false
@@ -493,6 +524,7 @@ const styles = StyleSheet.create({
     },
 
     title: {
+        flex: 1,
         marginTop: 20,
         fontSize: 28,
         fontWeight: '700',
@@ -510,7 +542,7 @@ const styles = StyleSheet.create({
     },
 
     sectionTitle: {
-        marginBottom: 12,
+        marginBottom: 4,
         fontSize: 18,
         fontWeight: '700',
         color: '#4A2416',
@@ -531,6 +563,18 @@ const styles = StyleSheet.create({
     },
 
     info: {
+        marginTop: 4,
+        fontSize: 15,
+        color: '#7A6254',
+    },
+
+    infoAddress: {
+        marginTop: 15,
+        fontSize: 15,
+        color: '#7A6254',
+    },
+
+    infoPets: {
         marginTop: 6,
         fontSize: 15,
         color: '#7A6254',
@@ -736,5 +780,26 @@ const styles = StyleSheet.create({
         paddingVertical: 7,
         borderRadius: 16,
         fontSize: 14,
+    },
+
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+
+    favoriteIconButton: {
+        width: 40,
+        height: 40,
+        marginTop: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    favoriteIcon: {
+        fontSize: 30,
+        lineHeight: 32,
+        color: '#6B3A22',
     },
 });

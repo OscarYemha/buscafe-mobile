@@ -25,8 +25,10 @@ import { cafeIntents } from '../data/cafeIntents';
 import NearbyCafeCard from '../components/NearbyCafeCard';
 import { CafeSummary } from '../types/CafeSummary';
 import { getNearbyCafes, searchCafes } from '../services/api';
-import { getCurrentLocation, UserLocation } from '../services/location';
+import { getCurrentLocation, watchUserLocation, UserLocation } from '../services/location';
 import { useReviews } from '../context/ReviewsContext';
+import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 type Props = CompositeScreenProps<
     BottomTabScreenProps<
@@ -36,20 +38,79 @@ type Props = CompositeScreenProps<
     NativeStackScreenProps<RootStackParamlist>
 >;
 
+const MOVEMENT_THRESHOLD_METERS = 50;
+const SIGNIFICANT_ACCURACY_IMPROVEMENT_METERS = 10;
+const AUTO_REFRESH_COOLDOWN_MS = 10000;
+
+function calculateLocationDistanceMeters(
+  location1: UserLocation,
+  location2: UserLocation
+): number
+{
+  const earthRadiusMeters = 6371000;
+
+  const latitudeDifference =
+    degreesToRadians(
+      location2.latitude - location1.latitude
+    );
+
+  const longitudeDifference =
+    degreesToRadians(
+      location2.longitude - location1.longitude
+    );
+
+  const latitude1 =
+    degreesToRadians(location1.latitude);
+
+  const latitude2 =
+    degreesToRadians(location2.latitude);
+
+  const a =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(latitude1) *
+      Math.cos(latitude2) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  const c =
+    2 * Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+  return earthRadiusMeters * c;
+}
+
+function degreesToRadians(degrees: number): number
+{
+  return degrees * (Math.PI / 180);
+}
 
 export default function HomeScreen({navigation}: Props) {
   const scrollViewRef = useRef<ScrollView>(null);
   const waitingForLocationSettings = useRef(false);
+  const selectedLocationRef = useRef<UserLocation | null>(null);
+  const movementCandidateRef = useRef<UserLocation | null>(null);
+  const lastAutoRefreshRef = useRef<number>(0);
+  const autoRefreshInProgressRef = useRef(false);
 
   const { reviewsVersion } = useReviews();
-
   const lastReviewsVersion = useRef(reviewsVersion);
+
+  const { isAuthenticated } = useAuth();
+
+  const {
+    isFavorite,
+    toggleFavorite,
+  } = useFavorites();
+
 
   const [cafes, setCafes] = useState<CafeSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshingLocation, setRefreshingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [gpsMovementMeters, setGpsMovementMeters] = useState<number | null>(null);
+  const [gpsMovementDetected, setGpsMovementDetected] = useState(false);
   const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<CafeSummary[]>([]);
@@ -59,6 +120,28 @@ export default function HomeScreen({navigation}: Props) {
   const [resolvedQuery, setResolvedQuery] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const handleFavoritePress = async (
+    cafe: CafeSummary
+  ) => {
+    if (!isAuthenticated)
+    {
+      navigation.navigate('Login');
+      return;
+    }
+
+    try
+    {
+      await toggleFavorite(cafe);
+    }
+    catch (error)
+    {
+      console.error(
+        'Error al actualizar favorito:',
+        error
+      );
+    }
+  };
 
   async function loadNearbyCafes() {
     try
@@ -85,6 +168,7 @@ export default function HomeScreen({navigation}: Props) {
       const location = result.location;
 
       setCanAskLocationAgain(true);
+      selectedLocationRef.current = location;
       setUserLocation(location);
 
       const nearbyCafes = await getNearbyCafes(
@@ -111,6 +195,76 @@ export default function HomeScreen({navigation}: Props) {
     }
   }
 
+async function updateNearbyCafesFromLocation(
+  location: UserLocation
+)
+{
+  setUserLocation(location);
+
+  console.log(
+    '[NEARBY] ubicación enviada al backend:',
+    {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      accuracy: location.accuracy,
+    }
+  );
+
+  const nearbyCafes =
+    await getNearbyCafes(
+      location.latitude,
+      location.longitude
+    );
+
+  setCafes(nearbyCafes);
+}
+
+async function autoRefreshNearbyCafes(
+  location: UserLocation
+)
+{
+  const now = Date.now();
+
+  if (autoRefreshInProgressRef.current)
+  {
+    return;
+  }
+
+  if (
+    now - lastAutoRefreshRef.current <
+    AUTO_REFRESH_COOLDOWN_MS
+  )
+  {
+    return;
+  }
+
+  try
+  {
+    autoRefreshInProgressRef.current = true;
+    lastAutoRefreshRef.current = now;
+
+    console.log(
+      '[GPS WATCH] actualización automática:',
+      location
+    );
+
+    await updateNearbyCafesFromLocation(
+      location
+    );
+  }
+  catch (error)
+  {
+    console.error(
+      'Error al actualizar cafés automáticamente:',
+      error
+    );
+  }
+  finally
+  {
+    autoRefreshInProgressRef.current = false;
+  }
+}
+
   async function refreshNearbyCafes()
 {
   try
@@ -118,32 +272,41 @@ export default function HomeScreen({navigation}: Props) {
     setRefreshingLocation(true);
     setError(null);
 
-    const result = await getCurrentLocation();
+    let location =
+      selectedLocationRef.current;
 
-    if (result.status === 'denied')
+    if (!location)
     {
-      setCanAskLocationAgain(result.canAskAgain);
+      const result =
+        await getCurrentLocation();
 
-      setError(
-        result.canAskAgain
-          ? 'Necesitamos tu ubicación para mostrar cafeterías cercanas.'
-          : 'El acceso a tu ubicación está desactivado. Habilitalo desde los ajustes del teléfono para ver las cafeterías cercanas.'
-      );
+      if (result.status === 'denied')
+      {
+        setCanAskLocationAgain(
+          result.canAskAgain
+        );
 
-      return;
+        setError(
+          result.canAskAgain
+            ? 'Necesitamos tu ubicación para mostrar cafeterías cercanas.'
+            : 'El acceso a tu ubicación está desactivado. Habilitalo desde los ajustes del teléfono para ver las cafeterías cercanas.'
+        );
+
+        return;
+      }
+
+      location = result.location;
+
+      selectedLocationRef.current =
+        location;
     }
 
-    const location = result.location;
-
     setCanAskLocationAgain(true);
-    setUserLocation(location);
 
-    const nearbyCafes = await getNearbyCafes(
-      location.latitude,
-      location.longitude
+    await updateNearbyCafesFromLocation(
+      location
     );
 
-    setCafes(nearbyCafes);
   }
   catch (error)
   {
@@ -186,6 +349,165 @@ export default function HomeScreen({navigation}: Props) {
   useEffect(() => {
     loadNearbyCafes();
   }, [])
+
+  useFocusEffect(
+    useCallback(() => {
+      let subscription:
+        { remove: () => void } | null = null;
+
+      let cancelled = false;
+
+      const startLocationWatch = async () => {
+        try
+        {
+          subscription =
+            await watchUserLocation((location) => {
+              if (cancelled)
+              {
+                return;
+              }
+
+              const selectedLocation =
+                selectedLocationRef.current;
+
+              if (!selectedLocation)
+              {
+                selectedLocationRef.current = location;
+
+                console.log(
+                  '[GPS WATCH] primera ubicación seleccionada:',
+                  location
+                );
+
+                return;
+              }
+
+              const distanceMeters =
+                calculateLocationDistanceMeters(
+                  selectedLocation,
+                  location
+                );
+
+              setGpsMovementMeters(distanceMeters);
+
+              const currentAccuracy =
+                selectedLocation.accuracy ??
+                Number.POSITIVE_INFINITY;
+
+              const newAccuracy =
+                location.accuracy ??
+                Number.POSITIVE_INFINITY;
+
+              console.log(
+                '[GPS WATCH] candidata:',
+                {
+                  distanceMeters:
+                    Math.round(distanceMeters),
+                  currentAccuracy:
+                    Math.round(currentAccuracy),
+                  newAccuracy:
+                    Math.round(newAccuracy),
+                }
+              );
+
+              if (distanceMeters >= MOVEMENT_THRESHOLD_METERS)
+              {
+                const movementCandidate =
+                  movementCandidateRef.current;
+
+                if (!movementCandidate)
+                {
+                  movementCandidateRef.current = location;
+
+                  console.log(
+                    '[GPS WATCH] posible desplazamiento:',
+                    location
+                  );
+
+                  return;
+                }
+
+                const candidateDistanceMeters =
+                  calculateLocationDistanceMeters(
+                    movementCandidate,
+                    location
+                  );
+
+                if (candidateDistanceMeters <= MOVEMENT_THRESHOLD_METERS)
+                {
+                  selectedLocationRef.current = location;
+                  movementCandidateRef.current = null;
+
+                  setGpsMovementDetected(true);
+
+                  console.log(
+                    '[GPS WATCH] desplazamiento confirmado:',
+                    location
+                  );
+
+                  void autoRefreshNearbyCafes(
+                    location
+                  );
+
+                  return;
+                }
+
+                movementCandidateRef.current = location;
+
+                return;
+              }
+
+              movementCandidateRef.current = null;
+
+              if (newAccuracy < currentAccuracy)
+              {
+                const accuracyImprovement =
+                  currentAccuracy - newAccuracy;
+
+                selectedLocationRef.current = location;
+
+                console.log(
+                  '[GPS WATCH] mejora de precisión aceptada:',
+                  {
+                    location,
+                    accuracyImprovement,
+                  }
+                );
+
+                if (
+                  accuracyImprovement >=
+                  SIGNIFICANT_ACCURACY_IMPROVEMENT_METERS
+                )
+                {
+                  void autoRefreshNearbyCafes(
+                    location
+                  );
+                }
+              }
+            });
+
+          if (cancelled)
+          {
+            subscription.remove();
+          }
+        }
+        catch (error)
+        {
+          console.error(
+            'Error al seguir la ubicación:',
+            error
+          );
+        }
+      };
+
+      startLocationWatch();
+
+      return () => {
+        cancelled = true;
+        subscription?.remove();
+      };
+    }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -334,7 +656,7 @@ export default function HomeScreen({navigation}: Props) {
             </Text>
 
             <Image
-              source={require('../../assets/buscafe-icon.png')}
+              source={require('../../assets/buscafe-symbol-transparent.png')}
               style={styles.logoImage}
               resizeMode="cover"
             />
@@ -343,6 +665,23 @@ export default function HomeScreen({navigation}: Props) {
           <Text style={styles.subtitle}>
             Encontrá el café ideal para tu momento
           </Text>
+          {userLocation && (
+            <Text style={styles.locationDebug}>
+              GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
+              {'\n'}
+              Precisión: {userLocation.accuracy !== null
+                ? `±${Math.round(userLocation.accuracy)} m`
+                : 'no disponible'}
+              {'\n'}
+              Último cambio GPS: {gpsMovementMeters !== null
+                ? `${Math.round(gpsMovementMeters)} m`
+                : '—'}
+              {'\n'}
+              Desplazamiento ≥50 m: {gpsMovementDetected
+                ? 'SÍ ✓'
+                : 'no'}
+            </Text>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>
@@ -432,6 +771,10 @@ export default function HomeScreen({navigation}: Props) {
                 <NearbyCafeCard
                   key={cafe.googlePlaceId}
                   cafe={cafe}
+                  isFavorite={isFavorite(cafe.googlePlaceId)}
+                  onFavoritePress={() => {
+                    handleFavoritePress(cafe);
+                  }}
                   onPress={() => {
                     navigation.navigate('CafeDetail', {
                       googlePlaceId: cafe.googlePlaceId,
@@ -496,6 +839,10 @@ export default function HomeScreen({navigation}: Props) {
               <NearbyCafeCard
                 key={cafe.googlePlaceId}
                 cafe={cafe}
+                isFavorite={isFavorite(cafe.googlePlaceId)}
+                onFavoritePress={() => {
+                  handleFavoritePress(cafe);
+                }}
                 onPress={() => {
                     navigation.navigate('CafeDetail', {
                         googlePlaceId: cafe.googlePlaceId,
@@ -564,7 +911,6 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 40,
     height: 40,
-    borderRadius: 14,
   },
 
   logo: {
@@ -728,5 +1074,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+
+  locationDebug: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#7A6254',
   },
 });

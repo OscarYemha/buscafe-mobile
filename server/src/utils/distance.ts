@@ -8,7 +8,7 @@ export function calculateDistanceKm(
 
     const latitudeDifference = degreesToRadians(latitude2 - latitude1);
 
-    const longitudeDifference = degreesToRadians(longitude2 - longitude1)
+    const longitudeDifference = degreesToRadians(longitude2 - longitude1);
 
     const firstLatitude = degreesToRadians(latitude1);
 

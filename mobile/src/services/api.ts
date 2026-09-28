@@ -269,3 +269,111 @@ export async function getCurrentUser(
 
     return response.json();
 }
+
+export type FavoriteCafe = {
+    id: number;
+    googlePlaceId: string;
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    createdAt: string;
+};
+
+export type Favorite = {
+    id: number;
+    createdAt: string;
+    cafe: FavoriteCafe;
+};
+
+export type AddFavoriteData = {
+    googlePlaceId: string;
+    cafeName: string;
+    cafeAddress: string;
+    cafeLatitude: number;
+    cafeLongitude: number;
+};
+
+export async function getFavorites(): Promise<Favorite[]>
+{
+    const token = await SecureStore.getItemAsync('auth_token');
+
+    if (!token)
+    {
+        throw new Error('Tenés que iniciar sesión para ver tus favoritos');
+    }
+
+    const response = await fetch(
+        `${API_URL}/favorites`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    if (!response.ok)
+    {
+        throw new Error('No se pudieron obtener los favoritos');
+    }
+
+    return response.json();
+}
+
+export async function addFavorite(
+    data: AddFavoriteData
+): Promise<Favorite>
+{
+    const token = await SecureStore.getItemAsync('auth_token');
+
+    if (!token)
+    {
+        throw new Error('Tenés que iniciar sesión para agregar favoritos');
+    }
+
+    const response = await fetch(
+        `${API_URL}/favorites`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
+        }
+    );
+
+    if (!response.ok)
+    {
+        throw new Error('No se pudo agregar a favoritos');
+    }
+    
+    return response.json();
+}
+
+export async function removeFavorite(
+    googlePlaceId: string
+): Promise<void>
+{
+    const token = await SecureStore.getItemAsync('auth_token');
+
+    if (!token)
+    {
+        throw new Error('Tenés que iniciar sesión para quitar favoritos');
+    }
+
+    const response = await fetch(
+        `${API_URL}/favorites/${encodeURIComponent(googlePlaceId)}`,
+        {
+            method: 'DELETE',
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    if (!response.ok)
+    {
+        throw new Error('No se pudo quitar de favoritos');
+    }
+}

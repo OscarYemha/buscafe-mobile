@@ -7,6 +7,8 @@ import { cafeIntents } from "../data/cafeIntents";
 import { getNearbyCafes } from "../services/api";
 import { CafeSummary } from "../types/CafeSummary";
 import NearbyCafeCard from "../components/NearbyCafeCard";
+import { useAuth } from "../context/AuthContext";
+import { useFavorites } from "../context/FavoritesContext";
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'Results'>;
 
@@ -18,6 +20,10 @@ export default function ResultsScreen({ route, navigation }: Props) {
     } = route.params;
 
     const scrollViewRef = useRef<ScrollView>(null);
+
+    const { isAuthenticated } = useAuth();
+
+    const { isFavorite, toggleFavorite } = useFavorites();
 
     const [cafes, setCafes] = useState<CafeSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -55,6 +61,24 @@ export default function ResultsScreen({ route, navigation }: Props) {
         loadNearbyCafes();
     }, [latitude, longitude, intent]);
 
+    const handleFavoritePress = async (
+        cafe: CafeSummary
+    ) => {
+        if (!isAuthenticated)
+        {
+            navigation.navigate('Login');
+            return;
+        }
+
+        try
+        {
+            await toggleFavorite(cafe);
+        }
+        catch (error)
+        {
+            console.error('Error al actualizar favorito', error);
+        }
+    };
 
     const intentOption = intent
         ? cafeIntents.find(
@@ -115,6 +139,10 @@ export default function ResultsScreen({ route, navigation }: Props) {
                     <NearbyCafeCard
                         key={cafe.googlePlaceId}
                         cafe={cafe}
+                        isFavorite={isFavorite(cafe.googlePlaceId)}
+                        onFavoritePress={() => {
+                            handleFavoritePress(cafe);
+                        }}
                         onPress={() => {
                             navigation.navigate('CafeDetail', {
                                 googlePlaceId: cafe.googlePlaceId,

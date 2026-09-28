@@ -10,7 +10,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/buscafe-splash-content.png",
+          "image": "./assets/buscafe-splash-transparent.png",
           "imageWidth": 280,
           "resizeMode": "contain",
           "backgroundColor": "#F3E4C8"

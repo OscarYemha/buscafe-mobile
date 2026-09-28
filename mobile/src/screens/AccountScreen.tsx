@@ -93,7 +93,7 @@ export default function AccountScreen()
                     <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() => {
-                            // Favoritos se implementará después.
+                            navigation.navigate('Favorites');
                         }}
                     >
                         <Text style={styles.menuIcon}>

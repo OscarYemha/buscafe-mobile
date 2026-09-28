@@ -9,7 +9,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import MapScreen from '../screens/MapScreen';
 import AccountScreen from '../screens/AccountScreen';
-
+import FavoritesScreen from '../screens/FavoritesScreen';
 import { CafeIntent } from '../types/CafeIntent';
 
 export type RootStackParamlist = {
@@ -31,6 +31,7 @@ export type RootStackParamlist = {
     };
     Login: undefined;
     Register: undefined;
+    Favorites: undefined;
 };
 
 export type MainTabParamList = {
@@ -188,6 +189,13 @@ export default function AppNavigator()
                 component={RegisterScreen}
                 options={{
                     title: 'Crear cuenta',
+                }}
+            />
+            <Stack.Screen
+                name="Favorites"
+                component={FavoritesScreen}
+                options={{
+                    title: 'Cafés favoritos',
                 }}
             />
         </Stack.Navigator>

@@ -6,6 +6,7 @@ import { ReviewDraftProvider } from "./src/context/ReviewDraftContext";
 import { AuthProvider } from "./src/context/AuthContext";
 import { ReviewsProvider } from "./src/context/ReviewsContext";
 import { useAuth } from "./src/context/AuthContext";
+import { FavoritesProvider } from "./src/context/FavoritesContext";
 
 function AppContent()
 {
@@ -31,13 +32,15 @@ function AppContent()
   }
 
   return (
-    <ReviewsProvider>
-      <ReviewDraftProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-      </ReviewDraftProvider>
-    </ReviewsProvider>
+      <FavoritesProvider>
+        <ReviewsProvider>
+          <ReviewDraftProvider>
+            <NavigationContainer>
+              <AppNavigator />
+            </NavigationContainer>
+          </ReviewDraftProvider>
+        </ReviewsProvider>
+      </FavoritesProvider>
   );
 };
 
