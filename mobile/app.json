@@ -11,7 +11,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/buscafe-splash-transparent.png",
-          "imageWidth": 280,
+          "imageWidth": 330,
           "resizeMode": "contain",
           "backgroundColor": "#F3E4C8"
         }

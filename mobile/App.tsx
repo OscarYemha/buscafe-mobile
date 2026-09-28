@@ -7,12 +7,38 @@ import { AuthProvider } from "./src/context/AuthContext";
 import { ReviewsProvider } from "./src/context/ReviewsContext";
 import { useAuth } from "./src/context/AuthContext";
 import { FavoritesProvider } from "./src/context/FavoritesContext";
+import { useEffect, useState } from "react";
+import * as SplashScreen from "expo-splash-screen";
+
+SplashScreen.preventAutoHideAsync();
 
 function AppContent()
 {
   const { isRestoringSession } = useAuth();
 
-  if (isRestoringSession)
+  const [minimunSplashTimeElapsed, setMinimunSplashTimeElapsed] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setMinimunSplashTimeElapsed(true);
+    }, 1500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isRestoringSession && minimunSplashTimeElapsed)
+    {
+      SplashScreen.hideAsync();
+    }
+  }, [
+      isRestoringSession,
+      minimunSplashTimeElapsed,
+    ]);
+
+  if (isRestoringSession || !minimunSplashTimeElapsed)
   {
     return (
       <View
