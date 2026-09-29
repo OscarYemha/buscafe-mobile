@@ -477,13 +477,7 @@ export default function MapScreen(
                         >
                             {sortedCafes.map((cafe) => (
                                 <Marker
-                                    key={
-                                        `${cafe.googlePlaceId}-${
-                                            selectedCafeId === cafe.googlePlaceId
-                                                ? 'selected'
-                                                : 'normal'
-                                        }`
-                                    }
+                                    key={cafe.googlePlaceId}
                                     coordinate={{
                                         latitude: cafe.latitude,
                                         longitude: cafe.longitude,
@@ -548,13 +542,20 @@ export default function MapScreen(
                                 ref={listRef}
                                 data={sortedCafes}
                                 onScrollToIndexFailed={(info) => {
+                                    listRef.current?.scrollToOffset({
+                                        offset:
+                                            info.averageItemLength *
+                                            info.index,
+                                        animated: false,
+                                    });
+
                                     setTimeout(() => {
                                         listRef.current?.scrollToIndex({
                                             index: info.index,
                                             animated: true,
                                             viewPosition: 0.5,
                                         });
-                                    }, 300);
+                                    }, 100);
                                 }}
                                 keyExtractor={(cafe) =>
                                     cafe.googlePlaceId
@@ -705,7 +706,7 @@ const styles = StyleSheet.create({
     },
 
     listContainer: {
-        height: 190,
+        height: 200,
         backgroundColor: '#FFFDFC',
     },
 
