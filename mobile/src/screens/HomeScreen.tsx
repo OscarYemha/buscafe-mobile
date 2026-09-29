@@ -111,8 +111,6 @@ export default function HomeScreen({navigation}: Props) {
   const [refreshingLocation, setRefreshingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [gpsMovementMeters, setGpsMovementMeters] = useState<number | null>(null);
-  const [gpsMovementDetected, setGpsMovementDetected] = useState(false);
   const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<CafeSummary[]>([]);
@@ -371,8 +369,6 @@ async function autoRefreshNearbyCafes(
                   location
                 );
 
-              setGpsMovementMeters(distanceMeters);
-
               const currentAccuracy =
                 selectedLocation.accuracy ??
                 Number.POSITIVE_INFINITY;
@@ -403,8 +399,6 @@ async function autoRefreshNearbyCafes(
                 {
                   selectedLocationRef.current = location;
                   movementCandidateRef.current = null;
-
-                  setGpsMovementDetected(true);
 
                   void autoRefreshNearbyCafes(
                     location
@@ -634,23 +628,6 @@ async function autoRefreshNearbyCafes(
             <Text style={styles.subtitle}>
               Encontrá el café ideal para tu momento
             </Text>
-            {userLocation && (
-              <Text style={styles.locationDebug}>
-                GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
-                {'\n'}
-                Precisión: {userLocation.accuracy !== null
-                  ? `±${Math.round(userLocation.accuracy)} m`
-                  : 'no disponible'}
-                {'\n'}
-                Último cambio GPS: {gpsMovementMeters !== null
-                  ? `${Math.round(gpsMovementMeters)} m`
-                  : '—'}
-                {'\n'}
-                Desplazamiento ≥50 m: {gpsMovementDetected
-                  ? 'SÍ ✓'
-                  : 'no'}
-              </Text>
-            )}
           </View>
 
           <Text style={styles.sectionTitle}>
@@ -1049,12 +1026,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
-  },
-
-  locationDebug: {
-    marginTop: 8,
-    fontSize: 12,
-    lineHeight: 17,
-    color: '#7A6254',
   },
 });

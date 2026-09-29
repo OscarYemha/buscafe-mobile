@@ -64,6 +64,10 @@ function isCafe(place: GooglePlace): boolean {
     const primaryType =
         place.primaryType;
 
+    if (primaryType === 'gas_station') {
+        return false;
+    }
+
     const primaryIsCafe =
         primaryType !== undefined &&
         CAFE_TYPES.has(primaryType);

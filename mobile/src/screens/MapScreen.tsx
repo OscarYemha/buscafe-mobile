@@ -453,6 +453,17 @@ export default function MapScreen(
                             ref={mapRef}
                             style={styles.map}
                             mapType="standard"
+                            customMapStyle={[
+                                {
+                                    featureType: 'poi',
+                                    elementType: 'all',
+                                    stylers: [
+                                        {
+                                            visibility: 'off',
+                                        },
+                                    ],
+                                },
+                            ]}
                             initialRegion={{
                                 latitude:
                                     userLocation.latitude,
