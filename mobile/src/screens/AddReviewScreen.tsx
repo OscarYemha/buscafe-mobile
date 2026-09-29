@@ -1,4 +1,13 @@
-import { ScrollView, StyleSheet, Text, TextInput,TouchableOpacity, View } from 'react-native';
+import {
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamlist } from '../navigation/AppNavigator';
@@ -13,6 +22,7 @@ type Props = NativeStackScreenProps<
 >;
 
 export default function AddReviewScreen({ route, navigation }: Props) {
+
     const {
         googlePlaceId,
         cafeName,
@@ -371,215 +381,223 @@ export default function AddReviewScreen({ route, navigation }: Props) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
-                <Text style={styles.title}>
-                    Reseñar {cafeName}
-                </Text>
-
-                <Text style={styles.description}>
-                    Contanos cómo fue tu experiencia.
-                </Text>
-                <View style={styles.ratingSection}>
-                    <Text style={styles.label}>
-                        Tu valoración
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <Text style={styles.title}>
+                        Reseñar {cafeName}
                     </Text>
 
-                    <View style={styles.starsContainer}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                            <TouchableOpacity
-                                key={star}
-                                onPress={() => 
-                                    setDraft({
-                                        cafeId: googlePlaceId,
-                                        rating: star,
-                                        comment: isCurrentCafeDraft
-                                            ? draft.comment
-                                            : '',
-
-                                        coffeeRating: isCurrentCafeDraft
-                                            ? draft.coffeeRating
-                                            : null,
-
-                                        foodRating: isCurrentCafeDraft
-                                            ? draft.foodRating
-                                            : null,
-
-                                        serviceRating: isCurrentCafeDraft
-                                            ? draft.serviceRating
-                                            : null,
-
-                                        comfortRating: isCurrentCafeDraft
-                                            ? draft.comfortRating
-                                            : null,
-
-                                        quietRating: isCurrentCafeDraft
-                                            ? draft.quietRating
-                                            : null,
-
-                                        goodForWork: isCurrentCafeDraft
-                                            ? draft.goodForWork
-                                            : null,
-
-                                        goodForStudy: isCurrentCafeDraft
-                                            ? draft.goodForStudy
-                                            : null,
-
-                                        goodForDate: isCurrentCafeDraft
-                                            ? draft.goodForDate
-                                            : null,
-                                    })
-                                }
-                            >
-                                <Text style={styles.star}>
-                                    {star <= rating ? '★' : '☆'}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-                <View style={styles.specificRatingsSection}>
-                    <Text style={styles.label}>
-                        Contanos un poco más
+                    <Text style={styles.description}>
+                        Contanos cómo fue tu experiencia.
                     </Text>
-
-                    <Text style={styles.optionalText}>
-                        Estas valoraciones son opcionales.
-                    </Text>
-
-                    {renderSpecificRating(
-                        '☕ Café',
-                        'coffeeRating',
-                        coffeeRating
-                    )}
-
-                    {renderSpecificRating(
-                        '🍰 Comida',
-                        'foodRating',
-                        foodRating
-                    )}
-
-                    {renderSpecificRating(
-                        '🤝 Servicio',
-                        'serviceRating',
-                        serviceRating
-                    )}
-
-                    {renderSpecificRating(
-                        '🪑 Comodidad',
-                        'comfortRating',
-                        comfortRating
-                    )}
-
-                    {renderSpecificRating(
-                        '🔇 Tranquilidad',
-                        'quietRating',
-                        quietRating
-                    )}
-                </View>
-                <View style={styles.recommendationsSection}>
-                    <Text style={styles.label}>
-                        ¿Para qué lo recomendarías?
-                    </Text>
-
-                    <Text style={styles.optionalText}>
-                        Estas respuestas son opcionales.
-                    </Text>
-
-                    {renderRecommendation(
-                        '💻 Trabajar',
-                        'goodForWork',
-                        goodForWork
-                    )}
-
-                    {renderRecommendation(
-                        '📚 Estudiar',
-                        'goodForStudy',
-                        goodForStudy
-                    )}
-
-                    {renderRecommendation(
-                        '❤️ Cita',
-                        'goodForDate',
-                        goodForDate
-                    )}
-                </View>
-                <View style={styles.commentSection}>
-                    <Text style={styles.label}>
-                        Tu comentario
-                    </Text>
-
-                    <TextInput
-                        style={styles.commentInput}
-                        value={comment}
-                        onChangeText={(text) =>
-                            setDraft({
-                                cafeId: googlePlaceId,
-                                rating: isCurrentCafeDraft
-                                    ? draft.rating
-                                    : 0,
-                                comment: text,
-
-                                coffeeRating: isCurrentCafeDraft
-                                    ? draft.coffeeRating
-                                    : null,
-
-                                foodRating: isCurrentCafeDraft
-                                    ? draft.foodRating
-                                    : null,
-
-                                serviceRating: isCurrentCafeDraft
-                                    ? draft.serviceRating
-                                    : null,
-
-                                comfortRating: isCurrentCafeDraft
-                                    ? draft.comfortRating
-                                    : null,
-
-                                quietRating: isCurrentCafeDraft
-                                    ? draft.quietRating
-                                    : null,
-
-                                goodForWork: isCurrentCafeDraft
-                                    ? draft.goodForWork
-                                    : null,
-
-                                goodForStudy: isCurrentCafeDraft
-                                    ? draft.goodForStudy
-                                    : null,
-
-                                goodForDate: isCurrentCafeDraft
-                                    ? draft.goodForDate
-                                    : null,
-                            })
-                        }
-                        placeholder="Contanos qué te gustó o qué podría mejorar..."
-                        placeholderTextColor="#9A8578"
-                        multiline
-                        maxLength={500}
-                        textAlignVertical="top"
-                    />
-
-                    <Text style={styles.characterCount}>
-                        {comment.length}/500
-                    </Text>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.submitButton,
-                            !canSubmit && styles.submitButtonDisabled,
-                        ]}
-                        disabled={!canSubmit}
-                        onPress={handleSubmit}
-                    >
-                        <Text style={styles.submitButtonText}>
-                            Publicar reseña
+                    <View style={styles.ratingSection}>
+                        <Text style={styles.label}>
+                            Tu valoración
                         </Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
+
+                        <View style={styles.starsContainer}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <TouchableOpacity
+                                    key={star}
+                                    onPress={() => 
+                                        setDraft({
+                                            cafeId: googlePlaceId,
+                                            rating: star,
+                                            comment: isCurrentCafeDraft
+                                                ? draft.comment
+                                                : '',
+
+                                            coffeeRating: isCurrentCafeDraft
+                                                ? draft.coffeeRating
+                                                : null,
+
+                                            foodRating: isCurrentCafeDraft
+                                                ? draft.foodRating
+                                                : null,
+
+                                            serviceRating: isCurrentCafeDraft
+                                                ? draft.serviceRating
+                                                : null,
+
+                                            comfortRating: isCurrentCafeDraft
+                                                ? draft.comfortRating
+                                                : null,
+
+                                            quietRating: isCurrentCafeDraft
+                                                ? draft.quietRating
+                                                : null,
+
+                                            goodForWork: isCurrentCafeDraft
+                                                ? draft.goodForWork
+                                                : null,
+
+                                            goodForStudy: isCurrentCafeDraft
+                                                ? draft.goodForStudy
+                                                : null,
+
+                                            goodForDate: isCurrentCafeDraft
+                                                ? draft.goodForDate
+                                                : null,
+                                        })
+                                    }
+                                >
+                                    <Text style={styles.star}>
+                                        {star <= rating ? '★' : '☆'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                    <View style={styles.specificRatingsSection}>
+                        <Text style={styles.label}>
+                            Contanos un poco más
+                        </Text>
+
+                        <Text style={styles.optionalText}>
+                            Estas valoraciones son opcionales.
+                        </Text>
+
+                        {renderSpecificRating(
+                            '☕ Café',
+                            'coffeeRating',
+                            coffeeRating
+                        )}
+
+                        {renderSpecificRating(
+                            '🍰 Comida',
+                            'foodRating',
+                            foodRating
+                        )}
+
+                        {renderSpecificRating(
+                            '🤝 Servicio',
+                            'serviceRating',
+                            serviceRating
+                        )}
+
+                        {renderSpecificRating(
+                            '🪑 Comodidad',
+                            'comfortRating',
+                            comfortRating
+                        )}
+
+                        {renderSpecificRating(
+                            '🔇 Tranquilidad',
+                            'quietRating',
+                            quietRating
+                        )}
+                    </View>
+                    <View style={styles.recommendationsSection}>
+                        <Text style={styles.label}>
+                            ¿Para qué lo recomendarías?
+                        </Text>
+
+                        <Text style={styles.optionalText}>
+                            Estas respuestas son opcionales.
+                        </Text>
+
+                        {renderRecommendation(
+                            '💻 Trabajar',
+                            'goodForWork',
+                            goodForWork
+                        )}
+
+                        {renderRecommendation(
+                            '📚 Estudiar',
+                            'goodForStudy',
+                            goodForStudy
+                        )}
+
+                        {renderRecommendation(
+                            '❤️ Cita',
+                            'goodForDate',
+                            goodForDate
+                        )}
+                    </View>
+                    <View
+                        style={styles.commentSection}
+                    >
+                        <Text style={styles.label}>
+                            Tu comentario
+                        </Text>
+
+                        <TextInput
+                            style={styles.commentInput}
+                            value={comment}
+                            onChangeText={(text) =>
+                                setDraft({
+                                    cafeId: googlePlaceId,
+                                    rating: isCurrentCafeDraft
+                                        ? draft.rating
+                                        : 0,
+                                    comment: text,
+
+                                    coffeeRating: isCurrentCafeDraft
+                                        ? draft.coffeeRating
+                                        : null,
+
+                                    foodRating: isCurrentCafeDraft
+                                        ? draft.foodRating
+                                        : null,
+
+                                    serviceRating: isCurrentCafeDraft
+                                        ? draft.serviceRating
+                                        : null,
+
+                                    comfortRating: isCurrentCafeDraft
+                                        ? draft.comfortRating
+                                        : null,
+
+                                    quietRating: isCurrentCafeDraft
+                                        ? draft.quietRating
+                                        : null,
+
+                                    goodForWork: isCurrentCafeDraft
+                                        ? draft.goodForWork
+                                        : null,
+
+                                    goodForStudy: isCurrentCafeDraft
+                                        ? draft.goodForStudy
+                                        : null,
+
+                                    goodForDate: isCurrentCafeDraft
+                                        ? draft.goodForDate
+                                        : null,
+                                })
+                            }
+                            placeholder="Contanos qué te gustó o qué podría mejorar..."
+                            placeholderTextColor="#9A8578"
+                            multiline
+                            maxLength={500}
+                            textAlignVertical="top"
+                        />
+
+                        <Text style={styles.characterCount}>
+                            {comment.length}/500
+                        </Text>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.submitButton,
+                                !canSubmit && styles.submitButtonDisabled,
+                            ]}
+                            disabled={!canSubmit}
+                            onPress={handleSubmit}
+                        >
+                            <Text style={styles.submitButtonText}>
+                                Publicar reseña
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

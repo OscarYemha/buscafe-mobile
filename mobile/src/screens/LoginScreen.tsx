@@ -1,5 +1,8 @@
 import {
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -60,79 +63,89 @@ export default function LoginScreen( {navigation}: Props) {
     
         return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                <Text style={styles.title}>
-                    Iniciar sesión
-                </Text>
-
-                <Text style={styles.description}>
-                    Iniciá sesión para continuar en BusCafé.
-                </Text>
-
-                <View style={styles.form}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email"
-                        placeholderTextColor="#9A8578"
-                        value={email}
-                        onChangeText={setEmail}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        keyboardType="email-address"
-                        editable={!isLoading}
-                    />
-
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Contraseña"
-                        placeholderTextColor="#9A8578"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        editable={!isLoading}
-                    />
-
-                    {error && (
-                        <Text style={styles.error}>
-                            {error}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.content}>
+                        <Text style={styles.title}>
+                            Iniciar sesión
                         </Text>
-                    )}
 
-                    <TouchableOpacity
-                        style={[
-                            styles.loginButton,
-                            isLoading &&
-                                styles.loginButtonDisabled,
-                        ]}
-                        onPress={handleLogin}
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator
-                                color="#FFFFFF"
+                        <Text style={styles.description}>
+                            Iniciá sesión para continuar en BusCafé.
+                        </Text>
+
+                        <View style={styles.form}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Email"
+                                placeholderTextColor="#9A8578"
+                                value={email}
+                                onChangeText={setEmail}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                keyboardType="email-address"
+                                editable={!isLoading}
                             />
-                        ) : (
-                            <Text style={styles.loginButtonText}>
-                                Iniciar sesión
-                            </Text>
-                        )}
-                    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.registerLink}
-                        onPress={() =>
-                            navigation.replace('Register')
-                        }
-                        disabled={isLoading}
-                    >
-                        <Text style={styles.registerLinkText}>
-                            ¿No tenés cuenta? Registrate
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Contraseña"
+                                placeholderTextColor="#9A8578"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!isLoading}
+                            />
+
+                            {error && (
+                                <Text style={styles.error}>
+                                    {error}
+                                </Text>
+                            )}
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.loginButton,
+                                    isLoading &&
+                                        styles.loginButtonDisabled,
+                                ]}
+                                onPress={handleLogin}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <ActivityIndicator
+                                        color="#FFFFFF"
+                                    />
+                                ) : (
+                                    <Text style={styles.loginButtonText}>
+                                        Iniciar sesión
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.registerLink}
+                                onPress={() =>
+                                    navigation.replace('Register')
+                                }
+                                disabled={isLoading}
+                            >
+                                <Text style={styles.registerLinkText}>
+                                    ¿No tenés cuenta? Registrate
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

@@ -9,6 +9,7 @@ import {
 
 
 const GOOGLE_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
+const GOOGLE_NEARBY_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchNearby';
 const GOOGLE_PLACE_DETAILS_URL = 'https://places.googleapis.com/v1/places';
 
 const SEARCH_RADIUS_KM = 1;
@@ -60,28 +61,39 @@ function isCafe(place: GooglePlace): boolean {
         return false;
     }
 
+    const primaryType =
+        place.primaryType;
+
+    const primaryIsCafe =
+        primaryType !== undefined &&
+        CAFE_TYPES.has(primaryType);
+
+    const hasCoffeeShopAndCafe =
+        types.includes('coffee_shop') &&
+        types.includes('cafe');
+
     if (
-        place.primaryType &&
-        EXCLUDED_PRIMARY_TYPES.has(
-            place.primaryType
-        )
+        primaryType &&
+        EXCLUDED_PRIMARY_TYPES.has(primaryType) &&
+        !primaryIsCafe &&
+        !hasCoffeeShopAndCafe
     ) {
         return false;
     }
 
-    const name =
-        place.displayName?.text ?? '';
+        const name =
+            place.displayName?.text ?? '';
 
-    if (
-        EXCLUDED_NAME_PATTERNS.some(
-            (pattern) => pattern.test(name)
-        )
-    ) {
-        return false;
+        if (
+            EXCLUDED_NAME_PATTERNS.some(
+                (pattern) => pattern.test(name)
+            )
+        ) {
+            return false;
+        }
+
+        return true;
     }
-
-    return true;
-}
 
 async function searchCafesByText(
     latitude: number,
@@ -222,6 +234,159 @@ export async function searchAllCafesByText(
         });
 
     return nearbyPlaces;
+}
+
+interface NearbySearchPoint {
+    latitude: number;
+    longitude: number;
+}
+
+async function searchNearbyAtPoint(
+    point: NearbySearchPoint,
+    radiusMeters: number
+): Promise<GooglePlace[]> {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+
+    if (!apiKey) {
+        throw new Error(
+            'GOOGLE_PLACES_API_KEY no está configurada'
+        );
+    }
+
+    const response = await fetch(
+        GOOGLE_NEARBY_SEARCH_URL,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': [
+                    'places.id',
+                    'places.displayName',
+                    'places.formattedAddress',
+                    'places.addressComponents',
+                    'places.location',
+                    'places.types',
+                    'places.primaryType',
+                    'places.primaryTypeDisplayName',
+                    'places.googleMapsTypeLabel',
+                    'places.rating',
+                    'places.userRatingCount',
+                    'places.priceLevel',
+                    'places.allowsDogs',
+                    'places.currentOpeningHours.openNow',
+                ].join(','),
+            },
+            body: JSON.stringify({
+                includedTypes: [
+                    'coffee_shop',
+                    'cafe',
+                    'cafeteria',
+                ],
+                maxResultCount: 20,
+                rankPreference: 'DISTANCE',
+                locationRestriction: {
+                    circle: {
+                        center: point,
+                        radius: radiusMeters,
+                    },
+                },
+                languageCode: 'es',
+                regionCode: 'AR',
+            }),
+        }
+    );
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+
+        throw new Error(
+            `Google Places Nearby Search falló: ${response.status} ${errorBody}`
+        );
+    }
+
+    const data =
+        (await response.json()) as GoogleTextSearchResponse;
+
+    return data.places ?? [];
+}
+
+export async function searchCafesNearby(
+    latitude: number,
+    longitude: number
+): Promise<GooglePlace[]> {
+    const offsetLatitude = 0.0045;
+
+    const offsetLongitude =
+        0.0045 /
+        Math.cos(latitude * Math.PI / 180);
+
+    const searchPoints: NearbySearchPoint[] = [
+        {
+            latitude,
+            longitude,
+        },
+        {
+            latitude: latitude + offsetLatitude,
+            longitude,
+        },
+        {
+            latitude: latitude - offsetLatitude,
+            longitude,
+        },
+        {
+            latitude,
+            longitude: longitude + offsetLongitude,
+        },
+        {
+            latitude,
+            longitude: longitude - offsetLongitude,
+        },
+    ];
+
+    const results = await Promise.all(
+        searchPoints.map((point) =>
+            searchNearbyAtPoint(
+                point,
+                600
+            )
+        )
+    );
+
+    const uniquePlaces = new Map<string, GooglePlace>();
+
+    for (const places of results) {
+        for (const place of places) {
+            if (place.id) {
+                uniquePlaces.set(
+                    place.id,
+                    place
+                );
+            }
+        }
+    }
+
+    const nearbyPlaces =
+        Array.from(uniquePlaces.values())
+            .filter((place) => {
+                if (!place.location) {
+                    return false;
+                }
+
+                const distanceKm =
+                    calculateDistanceKm(
+                        latitude,
+                        longitude,
+                        place.location.latitude,
+                        place.location.longitude
+                    );
+
+                return (
+                    distanceKm <= SEARCH_RADIUS_KM
+                );
+            });
+
+    return nearbyPlaces.filter(isCafe);
 }
 
 async function searchPlacesByQuery(

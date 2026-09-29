@@ -12,7 +12,9 @@ import { StatusBar } from 'expo-status-bar';
 import {
   AppState,
   Image,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -201,15 +203,6 @@ async function updateNearbyCafesFromLocation(
 {
   setUserLocation(location);
 
-  console.log(
-    '[NEARBY] ubicación enviada al backend:',
-    {
-      latitude: location.latitude,
-      longitude: location.longitude,
-      accuracy: location.accuracy,
-    }
-  );
-
   const nearbyCafes =
     await getNearbyCafes(
       location.latitude,
@@ -242,11 +235,6 @@ async function autoRefreshNearbyCafes(
   {
     autoRefreshInProgressRef.current = true;
     lastAutoRefreshRef.current = now;
-
-    console.log(
-      '[GPS WATCH] actualización automática:',
-      location
-    );
 
     await updateNearbyCafesFromLocation(
       location
@@ -374,11 +362,6 @@ async function autoRefreshNearbyCafes(
               {
                 selectedLocationRef.current = location;
 
-                console.log(
-                  '[GPS WATCH] primera ubicación seleccionada:',
-                  location
-                );
-
                 return;
               }
 
@@ -398,18 +381,6 @@ async function autoRefreshNearbyCafes(
                 location.accuracy ??
                 Number.POSITIVE_INFINITY;
 
-              console.log(
-                '[GPS WATCH] candidata:',
-                {
-                  distanceMeters:
-                    Math.round(distanceMeters),
-                  currentAccuracy:
-                    Math.round(currentAccuracy),
-                  newAccuracy:
-                    Math.round(newAccuracy),
-                }
-              );
-
               if (distanceMeters >= MOVEMENT_THRESHOLD_METERS)
               {
                 const movementCandidate =
@@ -418,11 +389,6 @@ async function autoRefreshNearbyCafes(
                 if (!movementCandidate)
                 {
                   movementCandidateRef.current = location;
-
-                  console.log(
-                    '[GPS WATCH] posible desplazamiento:',
-                    location
-                  );
 
                   return;
                 }
@@ -439,11 +405,6 @@ async function autoRefreshNearbyCafes(
                   movementCandidateRef.current = null;
 
                   setGpsMovementDetected(true);
-
-                  console.log(
-                    '[GPS WATCH] desplazamiento confirmado:',
-                    location
-                  );
 
                   void autoRefreshNearbyCafes(
                     location
@@ -465,14 +426,6 @@ async function autoRefreshNearbyCafes(
                   currentAccuracy - newAccuracy;
 
                 selectedLocationRef.current = location;
-
-                console.log(
-                  '[GPS WATCH] mejora de precisión aceptada:',
-                  {
-                    location,
-                    accuracyImprovement,
-                  }
-                );
 
                 if (
                   accuracyImprovement >=
@@ -553,7 +506,12 @@ async function autoRefreshNearbyCafes(
             );
 
           setSearchResults(
-            result.cafes
+            [...result.cafes].sort((a, b) => {
+              if (a.distanceKm === null) return 1;
+              if (b.distanceKm === null) return -1;
+
+              return a.distanceKm - b.distanceKm;
+            })
           );
           
           setNextPageToken(result.nextPageToken);
@@ -612,10 +570,17 @@ async function autoRefreshNearbyCafes(
           userLocation?.longitude,
         );
 
-      setSearchResults((currentResults) => [
-        ...currentResults,
-        ...result.cafes
-      ]);
+      setSearchResults((currentResults) =>
+        [
+          ...currentResults,
+          ...result.cafes
+        ].sort((a, b) => {
+          if (a.distanceKm === null) return 1;
+          if (b.distanceKm === null) return -1;
+
+          return a.distanceKm - b.distanceKm;
+        })
+      );
 
       setNextPageToken(result.nextPageToken);
 
@@ -635,139 +600,216 @@ async function autoRefreshNearbyCafes(
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView
-        ref={scrollViewRef}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-        onScroll={(event) => {
-          const offsetY =
-            event.nativeEvent.contentOffset.y;
-
-          setShowScrollTop(offsetY > 500);
-        }}
-        scrollEventThrottle={16}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <StatusBar style="dark" />
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+          onScroll={(event) => {
+            const offsetY =
+              event.nativeEvent.contentOffset.y;
 
-        <View style={styles.header}>
-          <View style={styles.brandRow}>
-            <Text style={styles.logo}>
-              BusCafé
+            setShowScrollTop(offsetY > 500);
+          }}
+          scrollEventThrottle={16}
+        >
+          <StatusBar style="dark" />
+
+          <View style={styles.header}>
+            <View style={styles.brandRow}>
+              <Text style={styles.logo}>
+                BusCafé
+              </Text>
+
+              <Image
+                source={require('../../assets/buscafe-symbol-transparent.png')}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
+            </View>
+
+            <Text style={styles.subtitle}>
+              Encontrá el café ideal para tu momento
             </Text>
-
-            <Image
-              source={require('../../assets/buscafe-symbol-transparent.png')}
-              style={styles.logoImage}
-              resizeMode="cover"
-            />
-          </View>
-
-          <Text style={styles.subtitle}>
-            Encontrá el café ideal para tu momento
-          </Text>
-          {userLocation && (
-            <Text style={styles.locationDebug}>
-              GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
-              {'\n'}
-              Precisión: {userLocation.accuracy !== null
-                ? `±${Math.round(userLocation.accuracy)} m`
-                : 'no disponible'}
-              {'\n'}
-              Último cambio GPS: {gpsMovementMeters !== null
-                ? `${Math.round(gpsMovementMeters)} m`
-                : '—'}
-              {'\n'}
-              Desplazamiento ≥50 m: {gpsMovementDetected
-                ? 'SÍ ✓'
-                : 'no'}
-            </Text>
-          )}
-        </View>
-
-        <Text style={styles.sectionTitle}>
-          ¿Qué estás buscando?
-        </Text>
-
-        <View style={styles.optionsContainer}>
-          {cafeIntents.map((option) => (
-              <TouchableOpacity
-                  key={option.id}
-                  style={styles.optionCard}
-                  onPress={() => {
-                      if (!userLocation) {
-                          return;
-                      }
-
-                      navigation.navigate('Results', {
-                          intent: option.id,
-                          latitude: userLocation.latitude,
-                          longitude: userLocation.longitude,
-                      });
-                  }}
-              >
-                  <Text style={styles.optionIcon}>{option.icon}</Text>
-                  <Text style={styles.optionText}>{option.label}</Text>
-              </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={styles.sectionTitle}>
-          ¿Dónde querés buscar?
-        </Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar zona o cafetería"
-          placeholderTextColor="#8C7A6B"
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-
-        {searchText.trim().length >= 3 ? (
-          <Text style={styles.sectionTitle}>
-            {`Resultados para "${searchText.trim()}"`}
-          </Text>
-        ) : (
-          <View style={styles.nearbyHeader}>
-            <Text style={styles.nearbyTitle}>
-              Cafés cerca de vos
-            </Text>
-
-            {!loading && !error && (
-              <TouchableOpacity
-                style={[
-                  styles.refreshButton,
-                  refreshingLocation &&
-                    styles.refreshButtonDisabled,
-                ]}
-                onPress={refreshNearbyCafes}
-                disabled={refreshingLocation}
-              >
-                <Text style={styles.refreshButtonText}>
-                  {refreshingLocation
-                    ? 'Actualizando...'
-                    : '↻  Actualizar cafés'}
-                </Text>
-              </TouchableOpacity>
+            {userLocation && (
+              <Text style={styles.locationDebug}>
+                GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
+                {'\n'}
+                Precisión: {userLocation.accuracy !== null
+                  ? `±${Math.round(userLocation.accuracy)} m`
+                  : 'no disponible'}
+                {'\n'}
+                Último cambio GPS: {gpsMovementMeters !== null
+                  ? `${Math.round(gpsMovementMeters)} m`
+                  : '—'}
+                {'\n'}
+                Desplazamiento ≥50 m: {gpsMovementDetected
+                  ? 'SÍ ✓'
+                  : 'no'}
+              </Text>
             )}
           </View>
-        )}
 
-        {searchText.trim().length >= 3 && searchLoading && (
-          <Text style={styles.message}>
-            Buscando cafeterías...
+          <Text style={styles.sectionTitle}>
+            ¿Qué estás buscando?
           </Text>
-        )}
 
-        {searchText.trim().length >= 3 && searchError && (
-          <Text style={styles.error}>
-            {searchError}
+          <View style={styles.optionsContainer}>
+            {cafeIntents.map((option) => (
+                <TouchableOpacity
+                    key={option.id}
+                    style={styles.optionCard}
+                    onPress={() => {
+                        if (!userLocation) {
+                            return;
+                        }
+
+                        navigation.navigate('Results', {
+                            intent: option.id,
+                            latitude: userLocation.latitude,
+                            longitude: userLocation.longitude,
+                        });
+                    }}
+                >
+                    <Text style={styles.optionIcon}>{option.icon}</Text>
+                    <Text style={styles.optionText}>{option.label}</Text>
+                </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.sectionTitle}>
+            ¿Dónde querés buscar?
           </Text>
-        )}
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar zona o cafetería"
+            placeholderTextColor="#8C7A6B"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
 
-        {searchText.trim().length >= 3 &&
-          !searchLoading &&
-          !searchError && (
+          {searchText.trim().length >= 3 ? (
+            <Text style={styles.sectionTitle}>
+              {`Resultados para "${searchText.trim()}"`}
+            </Text>
+          ) : (
+            <View style={styles.nearbyHeader}>
+              <Text style={styles.nearbyTitle}>
+                Cafés cerca de vos
+              </Text>
+
+              {!loading && !error && (
+                <TouchableOpacity
+                  style={[
+                    styles.refreshButton,
+                    refreshingLocation &&
+                      styles.refreshButtonDisabled,
+                  ]}
+                  onPress={refreshNearbyCafes}
+                  disabled={refreshingLocation}
+                >
+                  <Text style={styles.refreshButtonText}>
+                    {refreshingLocation
+                      ? 'Actualizando...'
+                      : '↻  Actualizar cafés'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {searchText.trim().length >= 3 && searchLoading && (
+            <Text style={styles.message}>
+              Buscando cafeterías...
+            </Text>
+          )}
+
+          {searchText.trim().length >= 3 && searchError && (
+            <Text style={styles.error}>
+              {searchError}
+            </Text>
+          )}
+
+          {searchText.trim().length >= 3 &&
+            !searchLoading &&
+            !searchError && (
+              <View style={styles.cafesContainer}>
+                {searchResults.length === 0 && (
+                  <Text style={styles.message}>
+                    No se encontraron cafeterías para esta búsqueda.
+                  </Text>
+                )}
+                {searchResults.map((cafe) => (
+                  <NearbyCafeCard
+                    key={cafe.googlePlaceId}
+                    cafe={cafe}
+                    isFavorite={isFavorite(cafe.googlePlaceId)}
+                    onFavoritePress={() => {
+                      handleFavoritePress(cafe);
+                    }}
+                    onPress={() => {
+                      navigation.navigate('CafeDetail', {
+                        googlePlaceId: cafe.googlePlaceId,
+                      });
+                    }}
+                  />
+                ))}
+                {searchResults.length > 0 && nextPageToken && (
+                  <TouchableOpacity
+                    style={styles.showAllButton}
+                    onPress={loadMoreSearchResults}
+                    disabled={loadingMore}
+                  >
+                    <Text style={styles.showAllButtonText}>
+                      {loadingMore
+                        ? 'Cargando...'
+                        : 'Ver más'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+          )}
+
+          {searchText.trim().length < 3 && loading && (
+            <Text style={styles.message}>
+              Buscando cafeterías cercanas...
+            </Text>
+          )}
+
+          {searchText.trim().length < 3 && error && (
+            <View style={styles.locationCard}>
+              <Text style={styles.error}>
+                {error}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.locationButton}
+                onPress={() => {
+                  if (canAskLocationAgain)
+                  {
+                    loadNearbyCafes();
+                  }
+                  else
+                  {
+                    waitingForLocationSettings.current = true;
+                    Linking.openSettings();
+                  }
+                }}
+              >
+                <Text style={styles.locationButtonText}>
+                  {canAskLocationAgain
+                    ? '📍 Usar mi ubicación'
+                    : '⚙️ Abrir ajustes'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {searchText.trim().length < 3 && !loading && !error && (
             <View style={styles.cafesContainer}>
-              {searchResults.map((cafe) => (
+              {cafes.slice(0, 5).map((cafe) => (
                 <NearbyCafeCard
                   key={cafe.googlePlaceId}
                   cafe={cafe}
@@ -776,102 +818,35 @@ async function autoRefreshNearbyCafes(
                     handleFavoritePress(cafe);
                   }}
                   onPress={() => {
-                    navigation.navigate('CafeDetail', {
-                      googlePlaceId: cafe.googlePlaceId,
-                    });
+                      navigation.navigate('CafeDetail', {
+                          googlePlaceId: cafe.googlePlaceId,
+                      });
                   }}
                 />
               ))}
-              {nextPageToken && (
-                <TouchableOpacity
-                  style={styles.showAllButton}
-                  onPress={loadMoreSearchResults}
-                  disabled={loadingMore}
-                >
-                  <Text style={styles.showAllButtonText}>
-                    {loadingMore
-                      ? 'Cargando...'
-                      : 'Ver más'}
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
-        )}
-
-        {searchText.trim().length < 3 && loading && (
-          <Text style={styles.message}>
-            Buscando cafeterías cercanas...
-          </Text>
-        )}
-
-        {searchText.trim().length < 3 && error && (
-          <View style={styles.locationCard}>
-            <Text style={styles.error}>
-              {error}
-            </Text>
-
+          )}
+          {searchText.trim().length < 3 &&
+            !loading && 
+            !error && 
+            cafes.length > 5 && 
+            userLocation && (
             <TouchableOpacity
-              style={styles.locationButton}
+              style={styles.showAllButton}
               onPress={() => {
-                if (canAskLocationAgain)
-                {
-                  loadNearbyCafes();
-                }
-                else
-                {
-                  waitingForLocationSettings.current = true;
-                  Linking.openSettings();
-                }
+                navigation.navigate('Results', {
+                  latitude: userLocation.latitude,
+                  longitude: userLocation.longitude,
+                });
               }}
             >
-              <Text style={styles.locationButtonText}>
-                {canAskLocationAgain
-                  ? '📍 Usar mi ubicación'
-                  : '⚙️ Abrir ajustes'}
+              <Text style={styles.showAllButtonText}>
+                Ver todos
               </Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {searchText.trim().length < 3 && !loading && !error && (
-          <View style={styles.cafesContainer}>
-            {cafes.slice(0, 5).map((cafe) => (
-              <NearbyCafeCard
-                key={cafe.googlePlaceId}
-                cafe={cafe}
-                isFavorite={isFavorite(cafe.googlePlaceId)}
-                onFavoritePress={() => {
-                  handleFavoritePress(cafe);
-                }}
-                onPress={() => {
-                    navigation.navigate('CafeDetail', {
-                        googlePlaceId: cafe.googlePlaceId,
-                    });
-                }}
-              />
-            ))}
-          </View>
-        )}
-        {searchText.trim().length < 3 &&
-          !loading && 
-          !error && 
-          cafes.length > 5 && 
-          userLocation && (
-          <TouchableOpacity
-            style={styles.showAllButton}
-            onPress={() => {
-              navigation.navigate('Results', {
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-              });
-            }}
-          >
-            <Text style={styles.showAllButtonText}>
-              Ver todos
-            </Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
       {showScrollTop && (
         <TouchableOpacity
           style={styles.scrollTopButton}

@@ -18,7 +18,7 @@ export function calculateDistanceKm(
         Math.sin(latitudeDifference / 2) ** 2 +
         Math.cos(firstLatitude) * 
         Math.cos(secondLatitude) *
-        Math.sin(longitudeDifference) ** 2;
+        Math.sin(longitudeDifference / 2) ** 2;
 
     const c =
         2 * Math.atan2(

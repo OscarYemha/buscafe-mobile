@@ -1,5 +1,8 @@
 import {
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -106,87 +109,97 @@ export default function RegisterScreen({
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                <Text style={styles.title}>
-                    Crear cuenta
-                </Text>
-
-                <Text style={styles.description}>
-                    Registrate para guardar tus cafés favoritos y compartir reseñas.
-                </Text>
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="Nombre"
-                    placeholderTextColor="#9A8578"
-                    value={name}
-                    onChangeText={setName}
-                    editable={!isLoading}
-                />
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor="#9A8578"
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                    editable={!isLoading}
-                />
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="Contraseña"
-                    placeholderTextColor="#9A8578"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    editable={!isLoading}
-                />
-                <Text style={styles.passwordHint}>
-                    Mínimo 8 caracteres. Para mayor seguridad, combiná letras, números y símbolos.
-                </Text>
-
-                {error && (
-                    <Text style={styles.error}>
-                        {error}
-                    </Text>
-                )}
-
-                <TouchableOpacity
-                    style={[
-                        styles.registerButton,
-                        isLoading &&
-                            styles.buttonDisabled,
-                    ]}
-                    onPress={handleRegister}
-                    disabled={isLoading}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
                 >
-                    {isLoading ? (
-                        <ActivityIndicator />
-                    ) : (
-                        <Text style={styles.registerButtonText}>
+                    <View style={styles.content}>
+                        <Text style={styles.title}>
                             Crear cuenta
                         </Text>
-                    )}
-                </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={styles.loginLink}
-                    onPress={() =>
-                        navigation.replace('Login')
-                    }
-                    disabled={isLoading}
-                >
-                    <Text style={styles.loginLinkText}>
-                        ¿Ya tenés cuenta? Iniciá sesión
-                    </Text>
-                </TouchableOpacity>
-            </View>
+                        <Text style={styles.description}>
+                            Registrate para guardar tus cafés favoritos y compartir reseñas.
+                        </Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Nombre"
+                            placeholderTextColor="#9A8578"
+                            value={name}
+                            onChangeText={setName}
+                            editable={!isLoading}
+                        />
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Email"
+                            placeholderTextColor="#9A8578"
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            keyboardType="email-address"
+                            editable={!isLoading}
+                        />
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Contraseña"
+                            placeholderTextColor="#9A8578"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={!isLoading}
+                        />
+                        <Text style={styles.passwordHint}>
+                            Mínimo 8 caracteres. Para mayor seguridad, combiná letras, números y símbolos.
+                        </Text>
+
+                        {error && (
+                            <Text style={styles.error}>
+                                {error}
+                            </Text>
+                        )}
+
+                        <TouchableOpacity
+                            style={[
+                                styles.registerButton,
+                                isLoading &&
+                                    styles.buttonDisabled,
+                            ]}
+                            onPress={handleRegister}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                <ActivityIndicator />
+                            ) : (
+                                <Text style={styles.registerButtonText}>
+                                    Crear cuenta
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.loginLink}
+                            onPress={() =>
+                                navigation.replace('Login')
+                            }
+                            disabled={isLoading}
+                        >
+                            <Text style={styles.loginLinkText}>
+                                ¿Ya tenés cuenta? Iniciá sesión
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
