@@ -487,9 +487,7 @@ export default function MapScreen(
                                             ? 1000
                                             : 1
                                     }
-                                    tracksViewChanges={
-                                        selectedCafeId === cafe.googlePlaceId
-                                    }
+                                    tracksViewChanges={true}
                                     onPress={() => {
                                         const cafeId =
                                             cafe.googlePlaceId;
