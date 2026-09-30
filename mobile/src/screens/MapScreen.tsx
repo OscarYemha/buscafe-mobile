@@ -14,7 +14,7 @@ import {
     useState,
 } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Callout, Marker } from 'react-native-maps';
 import {
     getCurrentLocation,
     watchUserLocation,
@@ -527,6 +527,33 @@ export default function MapScreen(
                                             ☕
                                         </Text>
                                     </View>
+                                    <Callout>
+                                        <View style={styles.callout}>
+                                            <Text style={styles.calloutName}>
+                                                {cafe.name}
+                                            </Text>
+                                            <Text
+                                                style={styles.calloutAddress}
+                                                numberOfLines={1}
+                                                ellipsizeMode="tail"
+                                            >
+                                                {cafe.shortAddress}
+                                            </Text>
+                                            <Text style={styles.calloutRating}>
+                                                Google ⭐{' '}
+                                                {cafe.googleRating !== null
+                                                    ? cafe.googleRating.toFixed(1)
+                                                    : 'Sin puntuación'}
+                                            </Text>
+
+                                            <Text style={styles.calloutRating}>
+                                                BusCafé ⭐{' '}
+                                                {cafe.buscafeRating !== null
+                                                    ? cafe.buscafeRating.toFixed(1)
+                                                    : 'Sin puntuación'}
+                                            </Text>
+                                        </View>
+                                    </Callout>
                                 </Marker>
                             ))}
                         </MapView>
@@ -604,8 +631,12 @@ export default function MapScreen(
                                             <Text
                                                 style={styles.cafeName}
                                                 numberOfLines={1}
+                                                ellipsizeMode="tail"
                                             >
                                                 {cafe.name}
+                                                {cafe.shortAddress
+                                                    ? ` • ${cafe.shortAddress}`
+                                                    : ''}
                                             </Text>
 
                                             <Text style={styles.cafeRatings}>
@@ -786,5 +817,27 @@ const styles = StyleSheet.create({
 
     cafeRowSelected: {
         backgroundColor: '#F3E4C8',
+    },
+
+    callout: {
+        minWidth: 180,
+        paddingVertical: 4,
+    },
+
+    calloutAddress: {
+        fontSize: 13,
+        color: '#7A6254',
+        marginBottom: 6,
+    },
+
+    calloutName: {
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 6,
+    },
+
+    calloutRating: {
+        fontSize: 13,
+        marginTop: 2,
     },
 });
