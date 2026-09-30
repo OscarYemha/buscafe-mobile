@@ -18,6 +18,9 @@ model User {
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+  emailVerified            Boolean   @default(false)
+  emailVerificationCode    String?
+  emailVerificationExpires DateTime?
 
   reviews   Review[]
   favorites Favorite[]

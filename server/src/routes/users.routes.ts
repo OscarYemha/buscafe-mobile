@@ -4,6 +4,8 @@ import { Prisma } from "../generated/prisma/client.js";
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth.js";
+import { sendVerificationEmail } from "../services/email.js";
+import { randomInt } from 'node:crypto';
 
 const router = Router();
 
@@ -86,7 +88,8 @@ const isValidEmail = (email: string): boolean => {
 };
 
 router.post('/', async (req, res) => {
-    try {
+    try 
+    {
         const {
             name,
             email,
@@ -109,11 +112,24 @@ router.post('/', async (req, res) => {
 
         const passwordHash = await bcrypt.hash(password, 10);
 
+        const verificationCode =
+            randomInt(
+                100000,
+                1000000
+            ).toString();
+
+        const verificationExpires =
+            new Date(
+                Date.now() + 15 * 60 * 1000
+            );
+
         const user = await prisma.user.create({
             data: {
                 name: name.trim(),
                 email: email.trim().toLowerCase(),
                 passwordHash,
+                emailVerificationCode: verificationCode,
+                emailVerificationExpires: verificationExpires,
             },
             select: {
                 id: true,
@@ -123,33 +139,35 @@ router.post('/', async (req, res) => {
             },
         });
 
-        const jwtSecret = process.env.JWT_SECRET;
-
-        if (!jwtSecret)
+        try
         {
-            throw new Error('JWT_SECRET no está configurado');
+            await sendVerificationEmail(
+                user.email,
+                verificationCode
+            );
+        }
+        catch (error)
+        {
+            await prisma.user.delete({
+                where: {
+                    id: user.id,
+                },
+            });
+
+            throw error;
         }
 
-        const token =
-            jwt.sign(
-                {
-                    userId: user.id,
-                },
-                jwtSecret,
-                {
-                    expiresIn: '7d',
-                }
-            )
-
         return res.status(201).json({
-            token,
+            requiresEmailVerification: true,
             user: {
                 id: user.id,
                 name: user.name,
                 email: user.email,
             },
         });
-    } catch (error) {
+    } 
+    catch (error) 
+    {
         if (
             error instanceof Prisma.PrismaClientKnownRequestError &&
             error.code === 'P2002'
@@ -163,6 +181,187 @@ router.post('/', async (req, res) => {
 
         return res.status(500).json({
             error: 'No se pudo crear el usuario',
+        });
+    }
+});
+
+router.post('/resend-verification', async (req, res) => {
+    try
+    {
+        const {
+            email,
+        } = req.body;
+
+        if (
+            typeof email !== 'string' ||
+            email.trim() === '' ||
+            !isValidEmail(email.trim())
+        )
+        {
+            return res.status(400).json({
+                error: 'Email inválido',
+            });
+        }
+
+        const user =
+            await prisma.user.findUnique({
+                where: {
+                    email:
+                        email.trim().toLowerCase(),
+                },
+            });
+
+        if (!user)
+        {
+            return res.status(404).json({
+                error: 'Usuario no encontrado',
+            });
+        }
+
+        if (user.emailVerified)
+        {
+            return res.status(400).json({
+                error: 'El email ya está verificado',
+            });
+        }
+
+        const verificationCode =
+            randomInt(
+                100000,
+                1000000
+            ).toString();
+
+        const verificationExpires =
+            new Date(
+                Date.now() + 15 * 60 * 1000
+            );
+
+        await prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                emailVerificationCode:
+                    verificationCode,
+                emailVerificationExpires:
+                    verificationExpires,
+            },
+        });
+
+        await sendVerificationEmail(
+            user.email,
+            verificationCode
+        );
+
+        return res.json({
+            message:
+                'Código de verificación reenviado',
+        });
+    }
+    catch (error)
+    {
+        console.error(error);
+
+        return res.status(500).json({
+            error:
+                'No se pudo reenviar el código de verificación',
+        });
+    }
+});
+
+router.post('/verify-email', async (req, res) => {
+    try
+    {
+        const {
+            email,
+            code,
+        } = req.body;
+
+        if (
+            typeof email !== 'string' ||
+            email.trim() === '' ||
+            typeof code !== 'string' ||
+            !/^\d{6}$/.test(code)
+        )
+        {
+            return res.status(400).json({
+                error: 'Email o código de verificación inválido',
+            });
+        }
+
+        const user =
+            await prisma.user.findUnique({
+                where: {
+                    email:
+                        email.trim().toLowerCase(),
+                },
+            });
+
+        if (!user)
+        {
+            return res.status(400).json({
+                error: 'Código de verificación inválido',
+            });
+        }
+
+        if (
+            user.emailVerificationCode !== code ||
+            !user.emailVerificationExpires ||
+            user.emailVerificationExpires < new Date()
+        )
+        {
+            return res.status(400).json({
+                error: 'El código de verificación es inválido o venció',
+            });
+        }
+
+        const verifiedUser =
+            await prisma.user.update({
+                where: {
+                    id: user.id,
+                },
+                data: {
+                    emailVerified: true,
+                    emailVerificationCode: null,
+                    emailVerificationExpires: null,
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            });
+
+        const jwtSecret =
+            process.env.JWT_SECRET;
+
+        if (!jwtSecret)
+        {
+            throw new Error('JWT_SECRET no está configurado');
+        }
+
+        const token =
+            jwt.sign(
+                {
+                    userId: verifiedUser.id,
+                },
+                jwtSecret,
+                {
+                    expiresIn: '7d',
+                }
+            );
+
+        return res.json({
+            token,
+            user: verifiedUser,
+        });
+    }
+    catch (error)
+    {
+        console.error(error);
+
+        return res.status(500).json({
+            error: 'No se pudo verificar el email',
         });
     }
 });
@@ -209,6 +408,14 @@ router.post('/login', async (req, res) => {
         {
             return res.status(401).json({
                 error: 'Email o contraseña incorrectos',
+            });
+        }
+
+        if (!user.emailVerified)
+        {
+            return res.status(403).json({
+                error: 'Tenés que verificar tu email antes de iniciar sesión',
+                requiresEmailVerification: true,
             });
         }
 
