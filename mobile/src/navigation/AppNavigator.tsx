@@ -11,6 +11,7 @@ import MapScreen from '../screens/MapScreen';
 import AccountScreen from '../screens/AccountScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import { CafeIntent } from '../types/CafeIntent';
+import VerifyEmailScreen from '../screens/VerifyEmailScreen';
 
 export type RootStackParamlist = {
     Main: undefined;
@@ -31,6 +32,9 @@ export type RootStackParamlist = {
     };
     Login: undefined;
     Register: undefined;
+    VerifyEmail: {
+        email: string;
+    }
     Favorites: undefined;
 };
 
@@ -189,6 +193,13 @@ export default function AppNavigator()
                 component={RegisterScreen}
                 options={{
                     title: 'Crear cuenta',
+                }}
+            />
+            <Stack.Screen
+                name="VerifyEmail"
+                component={VerifyEmailScreen}
+                options={{
+                    title: 'Verificar email',
                 }}
             />
             <Stack.Screen

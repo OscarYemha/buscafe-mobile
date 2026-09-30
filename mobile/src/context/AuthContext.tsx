@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import * as SecureStore from 'expo-secure-store';
-import { AuthUser, getCurrentUser, loginUser, registerUser } from "../services/api";
+import { AuthUser, getCurrentUser, loginUser, registerUser, RegisterResponse, verifyEmail } from "../services/api";
 
 type AuthContextType = {
     user: AuthUser | null;
@@ -16,6 +16,11 @@ type AuthContextType = {
         name: string,
         email: string,
         password: string
+    ) => Promise<RegisterResponse>;
+
+    verify: (
+        email: string,
+        code: string
     ) => Promise<void>;
 
     logout: () => Promise<void>;
@@ -113,6 +118,19 @@ export function AuthProvider({children, }: {children: ReactNode})
                 password
             });
 
+        return result;
+    }
+
+    const verify = async (
+        email: string,
+        code: string
+    ) => {
+        const result =
+            await verifyEmail(
+                email,
+                code
+            );
+
         await SecureStore.setItemAsync(
             TOKEN_KEY,
             result.token
@@ -124,7 +142,7 @@ export function AuthProvider({children, }: {children: ReactNode})
         );
 
         setUser(result.user);
-    }
+    };
 
     const logout = async () => {
         await SecureStore.deleteItemAsync(
@@ -146,6 +164,7 @@ export function AuthProvider({children, }: {children: ReactNode})
                 isRestoringSession,
                 login,
                 register,
+                verify,
                 logout,
             }}
         >

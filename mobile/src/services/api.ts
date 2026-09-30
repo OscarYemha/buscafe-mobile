@@ -183,6 +183,21 @@ export type LoginResponse = {
     user: AuthUser;
 };
 
+export class EmailVerificationRequiredError extends Error
+{
+    constructor()
+    {
+        super('Tenés que verificar tu email antes de iniciar sesión');
+
+        this.name = 'EmailVerificationRequiredError';
+    }
+}
+
+export type RegisterResponse = {
+    requiresEmailVerification: true;
+    user: AuthUser;
+};
+
 export type RegisterData = {
     name: string;
     email: string;
@@ -191,7 +206,7 @@ export type RegisterData = {
 
 export async function registerUser(
     data: RegisterData
-): Promise<LoginResponse>
+): Promise<RegisterResponse>
 {
     const response = await fetch(
         `${API_URL}/users`,
@@ -240,6 +255,13 @@ export async function loginUser(
     {
         const data = await response.json();
 
+        if (response.status === 403 &&
+            data.requiresEmailVerification === true
+        )
+        {
+            throw new EmailVerificationRequiredError();
+        }
+
         throw new Error(
             data.error ??
             'No se pudo iniciar sesión'
@@ -247,6 +269,66 @@ export async function loginUser(
     }
 
     return response.json();
+}
+
+export async function verifyEmail(
+    email: string,
+    code: string
+): Promise<LoginResponse>
+{
+    const response = await fetch(
+        `${API_URL}/users/verify-email`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+                code,
+            }),
+        }
+    );
+
+    if (!response.ok)
+    {
+        const data = await response.json();
+
+        throw new Error(
+            data.error ??
+            'No se pudo verificar el email'
+        );
+    }
+
+    return response.json();
+}
+
+export async function resendVerificationEmail(
+    email: string
+): Promise<void>
+{
+    const response = await fetch(
+        `${API_URL}/users/resend-verification`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+            }),
+        }
+    );
+
+    if (!response.ok)
+    {
+        const data = await response.json();
+
+        throw new Error(
+            data.error ??
+            'No se pudo reenviar el código'
+        );
+    }
 }
 
 export async function getCurrentUser(

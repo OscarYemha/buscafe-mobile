@@ -91,7 +91,12 @@ export default function RegisterScreen({
                 password
             );
 
-            navigation.goBack();
+            navigation.replace(
+                'VerifyEmail',
+                {
+                    email: email.trim().toLowerCase(),
+                }
+            );
         }
         catch (error)
         {

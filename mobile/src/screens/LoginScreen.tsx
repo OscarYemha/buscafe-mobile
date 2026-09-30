@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamlist } from '../navigation/AppNavigator';
+import { EmailVerificationRequiredError } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'Login'>;
 
@@ -49,6 +50,18 @@ export default function LoginScreen( {navigation}: Props) {
         }
         catch (error)
         {
+            if (error instanceof EmailVerificationRequiredError)
+            {
+                navigation.replace(
+                    'VerifyEmail',
+                    {
+                        email: email.trim().toLowerCase(),
+                    }
+                );
+
+                return;
+            }
+            
             setError(
                 error instanceof Error
                     ? error.message
