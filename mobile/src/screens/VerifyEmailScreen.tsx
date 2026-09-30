@@ -1,5 +1,7 @@
 import {
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -58,7 +60,7 @@ export default function VerifyEmailScreen({
         catch (error)
         {
             setCode('');
-            
+
             setError(
                 error instanceof Error
                     ? error.message
@@ -102,63 +104,68 @@ export default function VerifyEmailScreen({
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                <Text style={styles.title}>
-                    Verificá tu email
-                </Text>
-
-                <Text style={styles.description}>
-                    Enviamos un código de 6 dígitos a {email}.
-                </Text>
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="Código de 6 dígitos"
-                    placeholderTextColor="#9A8578"
-                    value={code}
-                    onChangeText={setCode}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                />
-
-                {error && (
-                    <Text style={styles.error}>
-                        {error}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <View style={styles.content}>
+                    <Text style={styles.title}>
+                        Verificá tu email
                     </Text>
-                )}
-                {message && (
-                    <Text style={styles.message}>
-                        {message}
-                    </Text>
-                )}
 
-                <TouchableOpacity
-                    style={[
-                        styles.verifyButton,
-                        isLoading &&
-                            styles.buttonDisabled,
-                    ]}
-                    onPress={handleVerify}
-                    disabled={isLoading}
-                >
-                    {isLoading ? (
-                        <ActivityIndicator />
-                    ) : (
-                        <Text style={styles.verifyButtonText}>
-                            Verificar email
+                    <Text style={styles.description}>
+                        Enviamos un código de 6 dígitos a {email}.
+                    </Text>
+
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Código de 6 dígitos"
+                        placeholderTextColor="#9A8578"
+                        value={code}
+                        onChangeText={setCode}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                    />
+
+                    {error && (
+                        <Text style={styles.error}>
+                            {error}
                         </Text>
                     )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.resendButton}
-                    onPress={handleResend}
-                    disabled={isLoading}
-                >
-                    <Text style={styles.resendButtonText}>
-                        Reenviar código
-                    </Text>
-                </TouchableOpacity>
-            </View>
+                    {message && (
+                        <Text style={styles.message}>
+                            {message}
+                        </Text>
+                    )}
+
+                    <TouchableOpacity
+                        style={[
+                            styles.verifyButton,
+                            isLoading &&
+                                styles.buttonDisabled,
+                        ]}
+                        onPress={handleVerify}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <ActivityIndicator />
+                        ) : (
+                            <Text style={styles.verifyButtonText}>
+                                Verificar email
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.resendButton}
+                        onPress={handleResend}
+                        disabled={isLoading}
+                    >
+                        <Text style={styles.resendButtonText}>
+                            Reenviar código
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

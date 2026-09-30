@@ -9,6 +9,7 @@ import {
     View,
 } from 'react-native';
 import {
+    useCallback,
     useEffect,
     useRef,
     useState,
@@ -24,6 +25,7 @@ import { getNearbyCafes } from '../services/api';
 import { CafeSummary } from '../types/CafeSummary';
 import {
     CompositeScreenProps,
+    useFocusEffect
 } from '@react-navigation/native';
 
 import {
@@ -65,12 +67,20 @@ export default function MapScreen(
     const waitingForLocationSettings = useRef(false);
     const mapRef = useRef<MapView>(null);
     const listRef = useRef<FlatList<CafeSummary>>(null);
+    const markerRefs = useRef<Record<string, React.ElementRef<typeof Marker> | null>>({});
     const selectedLocationRef = useRef<UserLocation | null>(null);
     const movementCandidateRef = useRef<UserLocation | null>(null);
     const lastAutoRefreshRef = useRef(0);
     const autoRefreshInProgressRef = useRef(false);
     const cafesRequestIdRef = useRef(0);
 
+    useFocusEffect(
+        useCallback(() => {
+            return () => {
+                setSelectedCafeId(null);
+            };
+        }, [])
+    );
 
     const sortedCafes = [...cafes].sort((a, b) => {
         if (a.distanceKm === null)
@@ -478,6 +488,10 @@ export default function MapScreen(
                             {sortedCafes.map((cafe) => (
                                 <Marker
                                     key={cafe.googlePlaceId}
+                                    ref={(marker) => {
+                                        markerRefs.current[cafe.googlePlaceId] =
+                                            marker;
+                                    }}
                                     coordinate={{
                                         latitude: cafe.latitude,
                                         longitude: cafe.longitude,
@@ -487,12 +501,28 @@ export default function MapScreen(
                                             ? 1000
                                             : 1
                                     }
-                                    tracksViewChanges={true}
+                                    tracksViewChanges={false}
                                     onPress={() => {
                                         const cafeId =
                                             cafe.googlePlaceId;
 
                                         setSelectedCafeId(cafeId);
+
+                                        mapRef.current?.animateToRegion(
+                                            {
+                                                latitude: cafe.latitude,
+                                                longitude: cafe.longitude,
+                                                latitudeDelta: 0.01,
+                                                longitudeDelta: 0.01,
+                                            },
+                                            350
+                                        );
+
+                                        setTimeout(() => {
+                                            markerRefs.current[
+                                                cafe.googlePlaceId
+                                            ]?.showCallout();
+                                        }, 400);
 
                                         requestAnimationFrame(() => {
                                             const currentIndex =
@@ -539,18 +569,19 @@ export default function MapScreen(
                                             >
                                                 {cafe.shortAddress}
                                             </Text>
-                                            <Text style={styles.calloutRating}>
-                                                Google ⭐{' '}
+                                            <Text
+                                                style={styles.calloutRating}
+                                                numberOfLines={1}
+                                            >
+                                                Google ★{' '}
                                                 {cafe.googleRating !== null
                                                     ? cafe.googleRating.toFixed(1)
-                                                    : 'Sin puntuación'}
-                                            </Text>
-
-                                            <Text style={styles.calloutRating}>
-                                                BusCafé ⭐{' '}
+                                                    : '—'}
+                                                {'   ·   '}
+                                                BusCafé ★{' '}
                                                 {cafe.buscafeRating !== null
                                                     ? cafe.buscafeRating.toFixed(1)
-                                                    : 'Sin puntuación'}
+                                                    : '—'}
                                             </Text>
                                         </View>
                                     </Callout>
@@ -808,9 +839,6 @@ const styles = StyleSheet.create({
     },
 
     mapPinSelected: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
         backgroundColor: '#4A2416',
         borderWidth: 3,
     },
@@ -820,8 +848,14 @@ const styles = StyleSheet.create({
     },
 
     callout: {
-        minWidth: 180,
-        paddingVertical: 4,
+        minWidth: 210,
+        maxWidth: 280,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        backgroundColor: '#F3E4C8',
+        borderWidth: 1,
+        borderColor: '#D8BFA3',
+        borderRadius: 16,
     },
 
     calloutAddress: {
@@ -833,6 +867,7 @@ const styles = StyleSheet.create({
     calloutName: {
         fontSize: 15,
         fontWeight: '700',
+        color: '#4A2416',
         marginBottom: 6,
     },
 
