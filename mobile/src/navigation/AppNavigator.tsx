@@ -35,7 +35,6 @@ export type RootStackParamlist = {
     VerifyEmail: {
         email: string;
     }
-    Favorites: undefined;
 };
 
 export type MainTabParamList = {
@@ -44,11 +43,43 @@ export type MainTabParamList = {
     Account: undefined;
 };
 
+export type AccountStackParamList = {
+    AccountHome: undefined;
+    Favorites: undefined;
+};
+
 const Stack =
     createNativeStackNavigator<RootStackParamlist>();
 
 const Tab =
     createBottomTabNavigator<MainTabParamList>();
+
+const AccountStack =
+    createNativeStackNavigator<AccountStackParamList>();
+
+
+function AccountNavigator()
+{
+    return (
+        <AccountStack.Navigator>
+            <AccountStack.Screen
+                name="AccountHome"
+                component={AccountScreen}
+                options={{
+                    headerShown: false,
+                }}
+            />
+
+            <AccountStack.Screen
+                name="Favorites"
+                component={FavoritesScreen}
+                options={{
+                    title: 'Cafés favoritos',
+                }}
+            />
+        </AccountStack.Navigator>
+    );
+}
 
 function MainTabs()
 {
@@ -135,7 +166,7 @@ function MainTabs()
 
             <Tab.Screen
                 name="Account"
-                component={AccountScreen}
+                component={AccountNavigator}
                 options={{
                     title: 'Mi cuenta',
                 }}
@@ -200,13 +231,6 @@ export default function AppNavigator()
                 component={VerifyEmailScreen}
                 options={{
                     title: 'Verificar email',
-                }}
-            />
-            <Stack.Screen
-                name="Favorites"
-                component={FavoritesScreen}
-                options={{
-                    title: 'Cafés favoritos',
                 }}
             />
         </Stack.Navigator>

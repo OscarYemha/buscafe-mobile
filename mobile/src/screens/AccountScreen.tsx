@@ -10,10 +10,18 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../context/AuthContext';
-import { RootStackParamlist } from '../navigation/AppNavigator';
+import {
+    AccountStackParamList,
+    RootStackParamlist,
+} from '../navigation/AppNavigator';
 
-type RootNavigation =
-    NativeStackNavigationProp<RootStackParamlist>;
+type AccountNavigation =
+    NativeStackNavigationProp<
+        AccountStackParamList
+    > &
+    NativeStackNavigationProp<
+        RootStackParamlist
+    >;
 
 export default function AccountScreen()
 {
@@ -23,7 +31,7 @@ export default function AccountScreen()
     } = useAuth();
 
     const navigation =
-        useNavigation<RootNavigation>();
+        useNavigation<AccountNavigation>();
 
     if (!user)
     {
