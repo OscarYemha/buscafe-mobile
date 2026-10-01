@@ -63,6 +63,7 @@ export default function MapScreen(
     const [error, setError] = useState<string | null>(null);
     const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
+    const [mapVersion, setMapVersion] = useState(0);
 
     const waitingForLocationSettings = useRef(false);
     const mapRef = useRef<MapView>(null);
@@ -184,6 +185,11 @@ export default function MapScreen(
             )
             {
                 setCafes(nearbyCafes);
+                setSelectedCafeId(null);
+                setMapVersion(
+                    (currentVersion) =>
+                        currentVersion + 1
+                );
             }
         }
         catch (error)
@@ -460,6 +466,7 @@ export default function MapScreen(
                 userLocation && (
                     <View style={styles.mapContent}>
                         <MapView
+                            key={mapVersion}
                             ref={mapRef}
                             style={styles.map}
                             mapType="standard"
