@@ -502,6 +502,7 @@ export default function MapScreen(
                             {sortedCafes.map((cafe) => (
                                 <Marker
                                     key={cafe.googlePlaceId}
+                                    pinColor="#6B3A22"
                                     title={cafe.name}
                                     description={
                                         `${cafe.shortAddress}\n` +
