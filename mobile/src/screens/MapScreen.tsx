@@ -15,7 +15,7 @@ import {
     useState,
 } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Callout, Marker } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 import {
     getCurrentLocation,
     watchUserLocation,
@@ -502,6 +502,20 @@ export default function MapScreen(
                             {sortedCafes.map((cafe) => (
                                 <Marker
                                     key={cafe.googlePlaceId}
+                                    title={cafe.name}
+                                    description={
+                                        `${cafe.shortAddress}\n` +
+                                        `Google ★ ${
+                                            cafe.googleRating !== null
+                                                ? cafe.googleRating.toFixed(1)
+                                                : '—'
+                                        }\n` +
+                                        `BusCafé ★ ${
+                                            cafe.buscafeRating !== null
+                                                ? cafe.buscafeRating.toFixed(1)
+                                                : 'Sin reseñas'
+                                        }`
+                                    }
                                     coordinate={{
                                         latitude: cafe.latitude,
                                         longitude: cafe.longitude,
@@ -547,36 +561,7 @@ export default function MapScreen(
                                             });
                                         });
                                     }}
-                                >
-                                    <Callout>
-                                        <View>
-                                            <Text style={styles.calloutName}>
-                                                {cafe.name}
-                                            </Text>
-
-                                            <Text
-                                                style={styles.calloutAddress}
-                                                numberOfLines={1}
-                                            >
-                                                {cafe.shortAddress}
-                                            </Text>
-
-                                            <Text style={styles.calloutRating}>
-                                                Google ★{' '}
-                                                {cafe.googleRating !== null
-                                                    ? cafe.googleRating.toFixed(1)
-                                                    : '—'}
-                                            </Text>
-
-                                            <Text style={styles.calloutRating}>
-                                                BusCafé ★{' '}
-                                                {cafe.buscafeRating !== null
-                                                    ? cafe.buscafeRating.toFixed(1)
-                                                    : '—'}
-                                            </Text>
-                                        </View>
-                                    </Callout>
-                                </Marker>
+                                />
                             ))}
                         </MapView>
 
@@ -815,23 +800,5 @@ const styles = StyleSheet.create({
 
     cafeRowSelected: {
         backgroundColor: '#F3E4C8',
-    },
-
-    calloutAddress: {
-        fontSize: 13,
-        color: '#7A6254',
-        marginBottom: 6,
-    },
-
-    calloutName: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#4A2416',
-        marginBottom: 6,
-    },
-
-    calloutRating: {
-        fontSize: 13,
-        marginTop: 2,
     },
 });
