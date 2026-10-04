@@ -63,12 +63,9 @@ export default function MapScreen(
     const [error, setError] = useState<string | null>(null);
     const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
-    const [mapVersion, setMapVersion] = useState(0);
-
     const waitingForLocationSettings = useRef(false);
     const mapRef = useRef<MapView>(null);
     const listRef = useRef<FlatList<CafeSummary>>(null);
-    const markerRefs = useRef<Record<string, React.ElementRef<typeof Marker> | null>>({});
     const selectedLocationRef = useRef<UserLocation | null>(null);
     const movementCandidateRef = useRef<UserLocation | null>(null);
     const lastAutoRefreshRef = useRef(0);
@@ -79,6 +76,11 @@ export default function MapScreen(
         useCallback(() => {
             return () => {
                 setSelectedCafeId(null);
+
+                listRef.current?.scrollToOffset({
+                    offset: 0,
+                    animated: false,
+                });
             };
         }, [])
     );
@@ -186,10 +188,6 @@ export default function MapScreen(
             {
                 setCafes(nearbyCafes);
                 setSelectedCafeId(null);
-                setMapVersion(
-                    (currentVersion) =>
-                        currentVersion + 1
-                );
             }
         }
         catch (error)
@@ -466,7 +464,6 @@ export default function MapScreen(
                 userLocation && (
                     <View style={styles.mapContent}>
                         <MapView
-                            key={mapVersion}
                             ref={mapRef}
                             style={styles.map}
                             mapType="standard"
@@ -495,10 +492,6 @@ export default function MapScreen(
                             {sortedCafes.map((cafe) => (
                                 <Marker
                                     key={cafe.googlePlaceId}
-                                    ref={(marker) => {
-                                        markerRefs.current[cafe.googlePlaceId] =
-                                            marker;
-                                    }}
                                     coordinate={{
                                         latitude: cafe.latitude,
                                         longitude: cafe.longitude,
@@ -508,7 +501,6 @@ export default function MapScreen(
                                             ? 1000
                                             : 1
                                     }
-                                    tracksViewChanges={false}
                                     onPress={() => {
                                         const cafeId =
                                             cafe.googlePlaceId;
@@ -524,12 +516,6 @@ export default function MapScreen(
                                             },
                                             350
                                         );
-
-                                        setTimeout(() => {
-                                            markerRefs.current[
-                                                cafe.googlePlaceId
-                                            ]?.showCallout();
-                                        }, 400);
 
                                         requestAnimationFrame(() => {
                                             const currentIndex =
@@ -552,39 +538,27 @@ export default function MapScreen(
                                         });
                                     }}
                                 >
-                                    <View
-                                        style={[
-                                            styles.mapPin,
-                                            selectedCafeId ===
-                                                cafe.googlePlaceId &&
-                                                styles.mapPinSelected,
-                                        ]}
-                                    >
-                                        <Text style={styles.mapPinIcon}>
-                                            ☕
-                                        </Text>
-                                    </View>
                                     <Callout>
-                                        <View style={styles.callout}>
+                                        <View>
                                             <Text style={styles.calloutName}>
                                                 {cafe.name}
                                             </Text>
+
                                             <Text
                                                 style={styles.calloutAddress}
                                                 numberOfLines={1}
-                                                ellipsizeMode="tail"
                                             >
                                                 {cafe.shortAddress}
                                             </Text>
-                                            <Text
-                                                style={styles.calloutRating}
-                                                numberOfLines={1}
-                                            >
+
+                                            <Text style={styles.calloutRating}>
                                                 Google ★{' '}
                                                 {cafe.googleRating !== null
                                                     ? cafe.googleRating.toFixed(1)
                                                     : '—'}
-                                                {'   ·   '}
+                                            </Text>
+
+                                            <Text style={styles.calloutRating}>
                                                 BusCafé ★{' '}
                                                 {cafe.buscafeRating !== null
                                                     ? cafe.buscafeRating.toFixed(1)
@@ -756,22 +730,6 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
-    mapPin: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: '#6B3A22',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: '#FFFFFF',
-        elevation: 3,
-    },
-
-    mapPinIcon: {
-        fontSize: 17,
-    },
-
     listContainer: {
         height: 200,
         backgroundColor: '#FFFDFC',
@@ -845,24 +803,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    mapPinSelected: {
-        backgroundColor: '#4A2416',
-        borderWidth: 3,
-    },
-
     cafeRowSelected: {
         backgroundColor: '#F3E4C8',
-    },
-
-    callout: {
-        minWidth: 210,
-        maxWidth: 280,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        backgroundColor: '#F3E4C8',
-        borderWidth: 1,
-        borderColor: '#D8BFA3',
-        borderRadius: 16,
     },
 
     calloutAddress: {
