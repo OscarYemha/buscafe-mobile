@@ -188,6 +188,11 @@ export default function MapScreen(
             {
                 setCafes(nearbyCafes);
                 setSelectedCafeId(null);
+
+                listRef.current?.scrollToOffset({
+                    offset: 0,
+                    animated: false,
+                });
             }
         }
         catch (error)
@@ -335,6 +340,11 @@ export default function MapScreen(
                                 {
                                     setCafes(nearbyCafes);
                                     setSelectedCafeId(null);
+
+                                    listRef.current?.scrollToOffset({
+                                        offset: 0,
+                                        animated: false,
+                                    });
                                 }
 
                                 lastAutoRefreshRef.current =
