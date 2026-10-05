@@ -407,7 +407,7 @@ export default function MapScreen(
     return (
         <SafeAreaView
             style={styles.container}
-            edges={['top', 'left', 'right']}
+            edges={['left', 'right']}
         >
             <View style={styles.header}>
                 <Text style={styles.title}>

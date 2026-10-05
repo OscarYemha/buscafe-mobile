@@ -38,7 +38,7 @@ export default function AccountScreen()
         return (
             <SafeAreaView
                 style={styles.container}
-                edges={['top', 'left', 'right']}
+                edges={['left', 'right']}
             >
                 <View style={styles.content}>
                     <Text style={styles.title}>
@@ -80,7 +80,7 @@ export default function AccountScreen()
     return (
         <SafeAreaView
             style={styles.container}
-            edges={['top', 'left', 'right']}
+            edges={['left', 'right']}
         >
             <View style={styles.content}>
                 <Text style={styles.title}>
