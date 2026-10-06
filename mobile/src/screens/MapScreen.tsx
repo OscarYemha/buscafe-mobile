@@ -99,6 +99,14 @@ export default function MapScreen(
         return a.distanceKm - b.distanceKm;
     });
 
+    const selectedCafe =
+    selectedCafeId !== null
+        ? sortedCafes.find(
+            (cafe) =>
+                cafe.googlePlaceId === selectedCafeId
+        ) ?? null
+        : null;
+
     function calculateDistanceMeters(
         from: UserLocation,
         to: UserLocation
@@ -503,20 +511,6 @@ export default function MapScreen(
                                 <Marker
                                     key={cafe.googlePlaceId}
                                     pinColor="#6B3A22"
-                                    title={cafe.name}
-                                    description={
-                                        `${cafe.shortAddress}\n` +
-                                        `Google ★ ${
-                                            cafe.googleRating !== null
-                                                ? cafe.googleRating.toFixed(1)
-                                                : '—'
-                                        }\n` +
-                                        `BusCafé ★ ${
-                                            cafe.buscafeRating !== null
-                                                ? cafe.buscafeRating.toFixed(1)
-                                                : 'Sin reseñas'
-                                        }`
-                                    }
                                     coordinate={{
                                         latitude: cafe.latitude,
                                         longitude: cafe.longitude,
@@ -565,7 +559,35 @@ export default function MapScreen(
                                 />
                             ))}
                         </MapView>
+                        {selectedCafe && (
+                            <View style={styles.selectedCafeCard}>
+                                <Text style={styles.selectedCafeName}>
+                                    {selectedCafe.name}
+                                </Text>
 
+                                <Text
+                                    style={styles.selectedCafeAddress}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                >
+                                    {selectedCafe.shortAddress}
+                                </Text>
+
+                                <Text style={styles.selectedCafeRating}>
+                                    Google ⭐{' '}
+                                    {selectedCafe.googleRating !== null
+                                        ? selectedCafe.googleRating.toFixed(1)
+                                        : 'Sin puntuación'}
+                                </Text>
+
+                                <Text style={styles.selectedCafeRating}>
+                                    BusCafé ⭐{' '}
+                                    {selectedCafe.buscafeRating !== null
+                                        ? selectedCafe.buscafeRating.toFixed(1)
+                                        : 'Sin puntuación'}
+                                </Text>
+                            </View>
+                        )}
                         <View style={styles.listContainer}>
                             <Text style={styles.listTitle}>
                                 Cafeterías cercanas
@@ -683,8 +705,8 @@ const styles = StyleSheet.create({
 
     header: {
         paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 12,
+        paddingTop: 5,
+        paddingBottom: 8,
     },
 
     title: {
@@ -724,6 +746,47 @@ const styles = StyleSheet.create({
 
     map: {
         flex: 1,
+    },
+
+    selectedCafeRatings: {
+        marginTop: 8,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 14,
+    },
+
+    selectedCafeCard: {
+        position: 'absolute',
+        alignSelf: 'center',
+        maxWidth: '85%',
+        minWidth: 210,
+        bottom: 216,
+        zIndex: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+        elevation: 5,
+    },
+
+    selectedCafeName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#4A2416',
+    },
+
+    selectedCafeAddress: {
+        marginTop: 2,
+        fontSize: 13,
+        color: '#7A6254',
+    },
+
+    selectedCafeRating: {
+        marginTop: 2,
+        fontSize: 13,
+        color: '#4A2416',
     },
 
     listContainer: {

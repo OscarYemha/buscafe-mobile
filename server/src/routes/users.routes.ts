@@ -6,8 +6,43 @@ import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth.js";
 import { sendVerificationEmail } from "../services/email.js";
 import { randomInt } from 'node:crypto';
+import multer from 'multer';
+import { supabase } from '../lib/supabase.js';
 
 const router = Router();
+
+const avatarUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024,
+    },
+    fileFilter: (
+        _req,
+        file,
+        callback
+    ) => {
+        const allowedMimeTypes = [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+        ];
+
+        if (
+            !allowedMimeTypes.includes(
+                file.mimetype
+            )
+        )
+        {
+            callback(
+                new Error('Formato de imagen no permitido')
+            );
+
+            return;
+        }
+
+        callback(null, true);
+    },
+});
 
 router.get(
     '/me',
@@ -36,6 +71,7 @@ router.get(
                         id: true,
                         name: true,
                         email: true,
+                        avatarUrl: true,
                     },
                 });
 
@@ -58,6 +94,103 @@ router.get(
         }
     }
 )
+
+router.patch(
+    '/me/avatar',
+    requireAuth,
+    avatarUpload.single('avatar'),
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        try
+        {
+            const userId = req.userId;
+            const file = req.file;
+
+            if (!userId)
+            {
+                return res.status(401).json({
+                    error: 'Autenticación requerida',
+                });
+            }
+
+            if (!file)
+            {
+                return res.status(400).json({
+                    error: 'No se recibió ninguna imagen',
+                });
+            }
+
+            const extension =
+                file.mimetype === 'image/png'
+                    ? 'png'
+                    : file.mimetype === 'image/webp'
+                        ? 'webp'
+                        : 'jpg';
+
+            const filePath =
+                `users/${userId}/avatar.${extension}`;
+
+            const {
+                error: uploadError,
+            } = await supabase.storage
+                .from('avatars')
+                .upload(
+                    filePath,
+                    file.buffer,
+                    {
+                        contentType: file.mimetype,
+                        upsert: true,
+                    }
+                );
+
+            if (uploadError)
+            {
+                console.error(uploadError);
+
+                return res.status(500).json({
+                    error: 'No se pudo subir la imagen',
+                });
+            }
+
+            const {
+                data: publicUrlData,
+            } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            const avatarUrl =
+                publicUrlData.publicUrl;
+
+            const user =
+                await prisma.user.update({
+                    where: {
+                        id: userId,
+                    },
+                    data: {
+                        avatarUrl,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        avatarUrl: true,
+                    },
+                });
+
+            return res.json(user);
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error: 'No se pudo actualizar la foto de perfil',
+            });
+        }
+    }
+);
 
 router.get('/', async (req, res) => {
     try
@@ -443,6 +576,7 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 name: user.name,
                 email: user.email,
+                avatarUrl: user.avatarUrl,
             },
         });
     }

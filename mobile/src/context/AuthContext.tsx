@@ -1,6 +1,20 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import {
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useState
+} from "react";
 import * as SecureStore from 'expo-secure-store';
-import { AuthUser, getCurrentUser, loginUser, registerUser, RegisterResponse, verifyEmail } from "../services/api";
+import {
+    AuthUser,
+    getCurrentUser,
+    loginUser,
+    registerUser,
+    RegisterResponse,
+    uploadAvatar,
+    verifyEmail
+} from "../services/api";
 
 type AuthContextType = {
     user: AuthUser | null;
@@ -23,10 +37,18 @@ type AuthContextType = {
         code: string
     ) => Promise<void>;
 
+    updateAvatar: (
+        imageUri: string
+    ) => Promise<void>;
+
+    updateUser: (
+        updatedUser: AuthUser
+    ) => Promise<void>;
+
     logout: () => Promise<void>;
 };
 
-const AuthContext = 
+const AuthContext =
     createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_KEY = 'auth_token';
@@ -55,7 +77,7 @@ export function AuthProvider({children, }: {children: ReactNode})
                     await getCurrentUser(token);
 
                 setUser(currentUser);
-                    
+
                 await SecureStore.setItemAsync(
                     USER_KEY,
                     JSON.stringify(currentUser)
@@ -111,7 +133,7 @@ export function AuthProvider({children, }: {children: ReactNode})
         email: string,
         password: string
     ) => {
-        const result = 
+        const result =
             await registerUser({
                 name,
                 email,
@@ -144,6 +166,46 @@ export function AuthProvider({children, }: {children: ReactNode})
         setUser(result.user);
     };
 
+    const updateAvatar = async (
+        imageUri: string
+    ) => {
+        const token =
+            await SecureStore.getItemAsync(
+                TOKEN_KEY
+            );
+
+        if (!token)
+        {
+            throw new Error(
+                'No hay una sesión activa'
+            );
+        }
+
+        const updatedUser =
+            await uploadAvatar(
+                token,
+                imageUri
+            );
+
+        await SecureStore.setItemAsync(
+            USER_KEY,
+            JSON.stringify(updatedUser)
+        );
+
+        setUser(updatedUser);
+    };
+
+    const updateUser = async (
+        updatedUser: AuthUser
+    ) => {
+        await SecureStore.setItemAsync(
+            USER_KEY,
+            JSON.stringify(updatedUser)
+        );
+
+        setUser(updatedUser);
+    };
+
     const logout = async () => {
         await SecureStore.deleteItemAsync(
             TOKEN_KEY
@@ -165,6 +227,8 @@ export function AuthProvider({children, }: {children: ReactNode})
                 login,
                 register,
                 verify,
+                updateAvatar,
+                updateUser,
                 logout,
             }}
         >

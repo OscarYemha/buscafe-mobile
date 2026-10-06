@@ -101,6 +101,27 @@ export default function AccountScreen()
                     <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() => {
+                            navigation.navigate('EditProfile');
+                        }}
+                    >
+                        <Text style={styles.menuIcon}>
+                            ♙
+                        </Text>
+
+                        <Text style={styles.menuText}>
+                            Editar perfil
+                        </Text>
+
+                        <Text style={styles.chevron}>
+                            ›
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
                             navigation.navigate('Favorites');
                         }}
                     >
@@ -252,5 +273,10 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
+    },
+
+    menuDivider: {
+        height: 1,
+        backgroundColor: '#E8D9C7',
     },
 });

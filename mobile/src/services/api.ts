@@ -176,6 +176,7 @@ export type AuthUser = {
     id: number;
     name: string;
     email: string;
+    avatarUrl: string | null;
 };
 
 export type LoginResponse = {
@@ -350,6 +351,63 @@ export async function getCurrentUser(
     }
 
     return response.json();
+}
+
+export async function uploadAvatar(
+    token: string,
+    imageUri: string
+): Promise<AuthUser>
+{
+    const formData = new FormData();
+
+    const fileName =
+        imageUri.split('/').pop() ??
+        'avatar.jpg';
+
+    const extension =
+        fileName
+            .split('.')
+            .pop()
+            ?.toLowerCase();
+
+    const mimeType =
+        extension === 'png'
+            ? 'image/png'
+            : extension === 'webp'
+                ? 'image/webp'
+                : 'image/jpeg';
+
+    formData.append(
+        'avatar',
+        {
+            uri: imageUri,
+            name: fileName,
+            type: mimeType,
+        } as any
+    );
+
+    const response = await fetch(
+        `${API_URL}/users/me/avatar`,
+        {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo actualizar la foto de perfil'
+        );
+    }
+
+    return data;
 }
 
 export type FavoriteCafe = {

@@ -17,6 +17,7 @@ import { View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { NavigatorScreenParams } from '@react-navigation/native';
 import SearchScreen from '../screens/SearchScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 
 export type RootStackParamlist = {
     Main: NavigatorScreenParams<MainTabParamList>;
@@ -52,6 +53,7 @@ export type MainTabParamList = {
 export type AccountStackParamList = {
     AccountHome: undefined;
     Favorites: undefined;
+    EditProfile: undefined;
 };
 
 const Stack =
@@ -67,7 +69,14 @@ const AccountStack =
 function AccountNavigator()
 {
     return (
-        <AccountStack.Navigator>
+        <AccountStack.Navigator
+            screenOptions={{
+                unstable_headerInsets: {
+                    top: false,
+                },
+                headerTintColor: '#6B3A22',
+            }}
+        >
             <AccountStack.Screen
                 name="AccountHome"
                 component={AccountScreen}
@@ -83,17 +92,33 @@ function AccountNavigator()
                     title: 'Cafés favoritos',
                 }}
             />
+
+            <AccountStack.Screen
+                name="EditProfile"
+                component={EditProfileScreen}
+                options={{
+                    title: 'Editar perfil',
+                }}
+            />
         </AccountStack.Navigator>
     );
 }
 
-type MainTabsProps = NativeStackScreenProps<       RootStackParamlist, 'Main'>;
+type MainTabsProps = NativeStackScreenProps<RootStackParamlist, 'Main'>;
 
 function MainTabs({ navigation }: MainTabsProps)
 {
     return (
         <View style={{ flex: 1 }}>
             <AppHeader
+                onHomePress={() => {
+                    navigation.navigate(
+                        'Main',
+                        {
+                            screen: 'Home',
+                        }
+                    );
+                }}
                 onAccountPress={() => {
                     navigation.navigate(
                         'Main',
@@ -202,7 +227,11 @@ function MainTabs({ navigation }: MainTabsProps)
 export default function AppNavigator()
 {
     return (
-        <Stack.Navigator>
+        <Stack.Navigator
+            screenOptions={{
+                headerTintColor: '#6B3A22',
+            }}
+        >
             <Stack.Screen
                 name="Main"
                 component={MainTabs}

@@ -10,12 +10,17 @@ import { useAuth } from '../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
+    onHomePress: () => void;
     onAccountPress: () => void;
     onSearchPress: () => void;
 };
 
 export default function AppHeader(
-    { onAccountPress, onSearchPress }: Props
+    {
+        onHomePress,
+        onAccountPress,
+        onSearchPress
+    }: Props
 )
 {
     const { user } = useAuth();
@@ -36,9 +41,14 @@ export default function AppHeader(
                 },
             ]}
         >
-            <Text style={styles.brand}>
-                BusCafé
-            </Text>
+            <TouchableOpacity
+                onPress={onHomePress}
+                activeOpacity={0.7}
+            >
+                <Text style={styles.brand}>
+                    BusCafé
+                </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
                 style={styles.searchButton}
@@ -68,7 +78,12 @@ export default function AppHeader(
                 onPress={onAccountPress}
                 activeOpacity={0.75}
             >
-                {initial ? (
+                {user?.avatarUrl ? (
+                    <Image
+                        source={{ uri: user.avatarUrl }}
+                        style={styles.avatarImage}
+                    />
+                ) : initial ? (
                     <Text style={styles.initial}>
                         {initial}
                     </Text>
@@ -89,9 +104,9 @@ const styles = StyleSheet.create({
         minHeight: 58,
         paddingHorizontal: 14,
         paddingBottom: 10,
-        backgroundColor: '#FFFDFC',
+        backgroundColor: '#6B3A22',
         borderBottomWidth: 1,
-        borderBottomColor: '#E8D9C7',
+        borderBottomColor: '#4A2416',
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
@@ -100,7 +115,7 @@ const styles = StyleSheet.create({
     brand: {
         fontSize: 21,
         fontWeight: '700',
-        color: '#6B3A22',
+        color: '#FFFDFC',
     },
 
     accountButton: {
@@ -108,10 +123,16 @@ const styles = StyleSheet.create({
         height: 40,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#D8C2B0',
-        backgroundColor: '#F8EFE7',
+        borderColor: '#E8D9C7',
+        backgroundColor: '#FFFDFC',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 20,
     },
 
     initial: {
@@ -126,9 +147,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 11,
-        backgroundColor: '#F8F1E7',
+        backgroundColor: '#FFFDFC',
         borderWidth: 1,
-        borderColor: '#E2D4C3',
+        borderColor: '#E8D9C7',
         borderRadius: 14,
     },
 
