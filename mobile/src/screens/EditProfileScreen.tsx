@@ -31,6 +31,9 @@ export default function EditProfileScreen()
     const [isSaving, setIsSaving] =
         useState(false);
 
+    const [saveSuccess, setSaveSuccess] =
+        useState(false);
+
     if (!user)
     {
         return null;
@@ -108,6 +111,12 @@ export default function EditProfileScreen()
 
                 setSelectedImageUri(null);
             }
+
+            setSaveSuccess(true);
+
+            setTimeout(() => {
+                setSaveSuccess(false);
+            }, 3000);
         }
         catch (error)
         {
@@ -195,6 +204,11 @@ export default function EditProfileScreen()
                             : 'Guardar cambios'}
                     </Text>
                 </TouchableOpacity>
+                {saveSuccess && (
+                    <Text style={styles.successText}>
+                        ✓ Cambios guardados correctamente
+                    </Text>
+                )}
             </View>
         </SafeAreaView>
     );
@@ -286,5 +300,13 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+
+    successText: {
+        marginTop: 12,
+        textAlign: 'center',
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#2E7D32',
     },
 });
