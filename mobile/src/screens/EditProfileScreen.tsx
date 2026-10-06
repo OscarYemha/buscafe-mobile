@@ -371,18 +371,19 @@ export default function EditProfileScreen()
                         )}
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.saveButton}
-                        onPress={handleSave}
-                        disabled={isSaving}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.saveButtonText}>
-                            {isSaving
-                                ? 'Guardando...'
-                                : 'Guardar cambios'}
-                        </Text>
-                    </TouchableOpacity>
+                    {!emailChangeRequested && (
+                        <TouchableOpacity
+                            style={styles.saveButton}
+                            onPress={handleSave}
+                            disabled={isSaving}
+                        >
+                            <Text style={styles.saveButtonText}>
+                                {isSaving
+                                    ? 'Guardando...'
+                                    : 'Guardar cambios'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                     {saveSuccess && (
                         <Text style={styles.successText}>
                             ✓ Cambios guardados correctamente
