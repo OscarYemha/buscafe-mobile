@@ -16,6 +16,7 @@ export default function EditProfileScreen()
     const {
         user,
         updateAvatar,
+        updateProfileName,
     } = useAuth();
 
     const [name, setName] =
@@ -69,7 +70,21 @@ export default function EditProfileScreen()
 
     const handleSave = async () =>
     {
-        if (!selectedImageUri)
+        if (!user)
+        {
+            return;
+        }
+
+        const normalizedName =
+            name.trim();
+
+        const nameChanged =
+            normalizedName !== user.name;
+
+        const avatarChanged =
+            selectedImageUri !== null;
+
+        if (!nameChanged && !avatarChanged)
         {
             return;
         }
@@ -78,11 +93,21 @@ export default function EditProfileScreen()
         {
             setIsSaving(true);
 
-            await updateAvatar(
-                selectedImageUri
-            );
+            if (nameChanged)
+            {
+                await updateProfileName(
+                    normalizedName
+                );
+            }
 
-            setSelectedImageUri(null);
+            if (avatarChanged)
+            {
+                await updateAvatar(
+                    selectedImageUri
+                );
+
+                setSelectedImageUri(null);
+            }
         }
         catch (error)
         {

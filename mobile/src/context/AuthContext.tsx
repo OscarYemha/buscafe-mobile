@@ -12,6 +12,7 @@ import {
     loginUser,
     registerUser,
     RegisterResponse,
+    updateProfile,
     uploadAvatar,
     verifyEmail
 } from "../services/api";
@@ -35,6 +36,10 @@ type AuthContextType = {
     verify: (
         email: string,
         code: string
+    ) => Promise<void>;
+
+    updateProfileName: (
+        name: string
     ) => Promise<void>;
 
     updateAvatar: (
@@ -187,12 +192,31 @@ export function AuthProvider({children, }: {children: ReactNode})
                 imageUri
             );
 
-        await SecureStore.setItemAsync(
-            USER_KEY,
-            JSON.stringify(updatedUser)
-        );
+        await updateUser(updatedUser);
+    };
 
-        setUser(updatedUser);
+    const updateProfileName = async (
+        name: string
+    ) => {
+        const token =
+            await SecureStore.getItemAsync(
+                TOKEN_KEY
+            );
+
+        if (!token)
+        {
+            throw new Error(
+                'No hay una sesión activa'
+            );
+        }
+
+        const updatedUser =
+            await updateProfile(
+                token,
+                name
+            );
+
+        await updateUser(updatedUser);
     };
 
     const updateUser = async (
@@ -228,6 +252,7 @@ export function AuthProvider({children, }: {children: ReactNode})
                 register,
                 verify,
                 updateAvatar,
+                updateProfileName,
                 updateUser,
                 logout,
             }}

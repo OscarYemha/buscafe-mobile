@@ -93,7 +93,75 @@ router.get(
             });
         }
     }
-)
+);
+
+router.patch(
+    '/me',
+    requireAuth,
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        try
+        {
+            const userId = req.userId;
+            const { name } = req.body;
+
+            if (!userId)
+            {
+                return res.status(401).json({
+                    error: 'Autenticación requerida',
+                });
+            }
+
+            if (
+                typeof name !== 'string' ||
+                !name.trim()
+            )
+            {
+                return res.status(400).json({
+                    error: 'El nombre es obligatorio',
+                });
+            }
+
+            const normalizedName =
+                name.trim();
+
+            if (normalizedName.length > 100)
+            {
+                return res.status(400).json({
+                    error: 'El nombre es demasiado largo',
+                });
+            }
+
+            const user =
+                await prisma.user.update({
+                    where: {
+                        id: userId,
+                    },
+                    data: {
+                        name: normalizedName,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        avatarUrl: true,
+                    },
+                });
+
+            return res.json(user);
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error: 'No se pudo actualizar el perfil',
+            });
+        }
+    }
+);
 
 router.patch(
     '/me/avatar',

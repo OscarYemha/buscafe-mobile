@@ -354,6 +354,38 @@ export async function getCurrentUser(
     return response.json();
 }
 
+export async function updateProfile(
+    token: string,
+    name: string
+): Promise<AuthUser>
+{
+    const response = await fetch(
+        `${API_URL}/users/me`,
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                name,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo actualizar el perfil'
+        );
+    }
+
+    return data;
+}
+
 export async function uploadAvatar(
     token: string,
     imageUri: string
