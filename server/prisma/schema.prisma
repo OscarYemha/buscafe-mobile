@@ -21,6 +21,9 @@ model User {
   emailVerified            Boolean   @default(false)
   emailVerificationCode    String?
   emailVerificationExpires DateTime?
+  pendingEmail             String?
+  emailChangeCode          String?
+  emailChangeCodeExpires   DateTime?
   avatarUrl                String?
 
   reviews   Review[]

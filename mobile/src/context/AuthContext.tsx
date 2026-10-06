@@ -14,7 +14,9 @@ import {
     RegisterResponse,
     updateProfile,
     uploadAvatar,
-    verifyEmail
+    verifyEmail,
+    requestEmailChange,
+    verifyEmailChange,
 } from "../services/api";
 
 type AuthContextType = {
@@ -35,6 +37,14 @@ type AuthContextType = {
 
     verify: (
         email: string,
+        code: string
+    ) => Promise<void>;
+
+    requestProfileEmailChange: (
+        email: string
+    ) => Promise<void>;
+
+    verifyProfileEmailChange: (
         code: string
     ) => Promise<void>;
 
@@ -219,6 +229,51 @@ export function AuthProvider({children, }: {children: ReactNode})
         await updateUser(updatedUser);
     };
 
+    const requestProfileEmailChange = async (
+        email: string
+    ) => {
+        const token =
+            await SecureStore.getItemAsync(
+                TOKEN_KEY
+            );
+
+        if (!token)
+        {
+            throw new Error(
+                'No hay una sesión activa'
+            );
+        }
+
+        await requestEmailChange(
+            token,
+            email
+        );
+    };
+
+    const verifyProfileEmailChange = async (
+        code: string
+    ) => {
+        const token =
+            await SecureStore.getItemAsync(
+                TOKEN_KEY
+            );
+
+        if (!token)
+        {
+            throw new Error(
+                'No hay una sesión activa'
+            );
+        }
+
+        const updatedUser =
+            await verifyEmailChange(
+                token,
+                code
+            );
+
+        await updateUser(updatedUser);
+    };
+
     const updateUser = async (
         updatedUser: AuthUser
     ) => {
@@ -251,6 +306,8 @@ export function AuthProvider({children, }: {children: ReactNode})
                 login,
                 register,
                 verify,
+                requestProfileEmailChange,
+                verifyProfileEmailChange,
                 updateAvatar,
                 updateProfileName,
                 updateUser,

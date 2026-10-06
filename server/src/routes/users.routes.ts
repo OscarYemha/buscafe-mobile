@@ -3,8 +3,14 @@ import prisma from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { AuthenticatedRequest, requireAuth } from "../middleware/auth.js";
-import { sendVerificationEmail } from "../services/email.js";
+import {
+    AuthenticatedRequest,
+    requireAuth
+} from "../middleware/auth.js";
+import {
+    sendEmailChangeVerification,
+    sendVerificationEmail
+} from '../services/email.js';
 import { randomInt } from 'node:crypto';
 import multer from 'multer';
 import { supabase } from '../lib/supabase.js';
@@ -158,6 +164,264 @@ router.patch(
 
             return res.status(500).json({
                 error: 'No se pudo actualizar el perfil',
+            });
+        }
+    }
+);
+
+router.post(
+    '/me/email-change',
+    requireAuth,
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        try
+        {
+            const userId = req.userId;
+            const { email } = req.body;
+
+            if (!userId)
+            {
+                return res.status(401).json({
+                    error: 'Autenticación requerida',
+                });
+            }
+
+            if (
+                typeof email !== 'string' ||
+                !email.trim()
+            )
+            {
+                return res.status(400).json({
+                    error: 'El nuevo email es obligatorio',
+                });
+            }
+
+            const normalizedEmail =
+                email.trim().toLowerCase();
+
+            const currentUser =
+                await prisma.user.findUnique({
+                    where: {
+                        id: userId,
+                    },
+                    select: {
+                        email: true,
+                    },
+                });
+
+            if (!currentUser)
+            {
+                return res.status(404).json({
+                    error: 'Usuario no encontrado',
+                });
+            }
+
+            if (
+                currentUser.email.toLowerCase() ===
+                normalizedEmail
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'El nuevo email debe ser diferente al actual',
+                });
+            }
+
+            const existingUser =
+                await prisma.user.findUnique({
+                    where: {
+                        email: normalizedEmail,
+                    },
+                    select: {
+                        id: true,
+                    },
+                });
+
+            if (existingUser)
+            {
+                return res.status(409).json({
+                    error:
+                        'Ese email ya está asociado a otra cuenta',
+                });
+            }
+
+            const code =
+                randomInt(
+                    100000,
+                    1000000
+                ).toString();
+
+            const expiresAt =
+                new Date(
+                    Date.now() +
+                    15 * 60 * 1000
+                );
+
+            await prisma.user.update({
+                where: {
+                    id: userId,
+                },
+                data: {
+                    pendingEmail:
+                        normalizedEmail,
+                    emailChangeCode:
+                        code,
+                    emailChangeCodeExpires:
+                        expiresAt,
+                },
+            });
+
+            await sendEmailChangeVerification(
+                normalizedEmail,
+                code
+            );
+
+            return res.json({
+                message:
+                    'Código de verificación enviado',
+            });
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error:
+                    'No se pudo iniciar el cambio de email',
+            });
+        }
+    }
+);
+
+router.post(
+    '/me/email-change/verify',
+    requireAuth,
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        try
+        {
+            const userId = req.userId;
+            const { code } = req.body;
+
+            if (!userId)
+            {
+                return res.status(401).json({
+                    error: 'Autenticación requerida',
+                });
+            }
+
+            if (
+                typeof code !== 'string' ||
+                !/^\d{6}$/.test(code)
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'El código debe tener 6 dígitos',
+                });
+            }
+
+            const user =
+                await prisma.user.findUnique({
+                    where: {
+                        id: userId,
+                    },
+                    select: {
+                        pendingEmail: true,
+                        emailChangeCode: true,
+                        emailChangeCodeExpires: true,
+                    },
+                });
+
+            if (
+                !user ||
+                !user.pendingEmail ||
+                !user.emailChangeCode ||
+                !user.emailChangeCodeExpires
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'No hay un cambio de email pendiente',
+                });
+            }
+
+            if (
+                user.emailChangeCodeExpires <
+                new Date()
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'El código de verificación venció',
+                });
+            }
+
+            if (
+                user.emailChangeCode !== code
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'El código de verificación es incorrecto',
+                });
+            }
+
+            const existingUser =
+                await prisma.user.findUnique({
+                    where: {
+                        email: user.pendingEmail,
+                    },
+                    select: {
+                        id: true,
+                    },
+                });
+
+            if (
+                existingUser &&
+                existingUser.id !== userId
+            )
+            {
+                return res.status(409).json({
+                    error:
+                        'Ese email ya está asociado a otra cuenta',
+                });
+            }
+
+            const updatedUser =
+                await prisma.user.update({
+                    where: {
+                        id: userId,
+                    },
+                    data: {
+                        email:
+                            user.pendingEmail,
+                        pendingEmail: null,
+                        emailChangeCode: null,
+                        emailChangeCodeExpires:
+                            null,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        avatarUrl: true,
+                    },
+                });
+
+            return res.json(updatedUser);
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error:
+                    'No se pudo confirmar el cambio de email',
             });
         }
     }

@@ -41,3 +41,34 @@ export const sendVerificationEmail =
             );
         }
     };
+
+    export const sendEmailChangeVerification =
+    async (
+        email: string,
+        code: string
+    ) => {
+        const { error } =
+            await resend.emails.send({
+                from: 'BusCafé <onboarding@resend.dev>',
+                to: email,
+                subject:
+                    'Confirmá tu nuevo email en BusCafé',
+                html: `
+                    <h2>BusCafé</h2>
+                    <p>Recibimos una solicitud para usar este email en tu cuenta.</p>
+                    <p>Tu código de verificación es:</p>
+                    <p style="font-size: 28px; font-weight: bold;">
+                        ${code}
+                    </p>
+                    <p>Este código vence en 15 minutos.</p>
+                    <p>Si no solicitaste este cambio, podés ignorar este mensaje.</p>
+                `,
+            });
+
+        if (error)
+        {
+            throw new Error(
+                `No se pudo enviar el email: ${error.message}`
+            );
+        }
+    };

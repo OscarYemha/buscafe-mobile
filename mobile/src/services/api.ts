@@ -386,6 +386,68 @@ export async function updateProfile(
     return data;
 }
 
+export async function requestEmailChange(
+    token: string,
+    email: string
+): Promise<void>
+{
+    const response = await fetch(
+        `${API_URL}/users/me/email-change`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                email,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo solicitar el cambio de email'
+        );
+    }
+}
+
+export async function verifyEmailChange(
+    token: string,
+    code: string
+): Promise<AuthUser>
+{
+    const response = await fetch(
+        `${API_URL}/users/me/email-change/verify`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                code,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo verificar el nuevo email'
+        );
+    }
+
+    return data;
+}
+
 export async function uploadAvatar(
     token: string,
     imageUri: string

@@ -15,6 +15,8 @@ export default function EditProfileScreen()
 {
     const {
         user,
+        requestProfileEmailChange,
+        verifyProfileEmailChange,
         updateAvatar,
         updateProfileName,
     } = useAuth();
@@ -33,6 +35,21 @@ export default function EditProfileScreen()
 
     const [saveSuccess, setSaveSuccess] =
         useState(false);
+
+    const [isRequestingEmailChange, setIsRequestingEmailChange] =
+        useState(false);
+
+    const [emailChangeRequested, setEmailChangeRequested] =
+        useState(false);
+
+    const [emailCodeSent, setEmailCodeSent] =
+        useState(false);
+
+    const [emailChangeSuccess, setEmailChangeSuccess] =
+        useState(false);
+
+    const [verificationCode, setVerificationCode] =
+        useState('');
 
     if (!user)
     {
@@ -68,6 +85,95 @@ export default function EditProfileScreen()
             setSelectedImageUri(
                 result.assets[0].uri
             );
+        }
+    };
+
+    const handleRequestEmailChange = async () =>
+    {
+        if (!user)
+        {
+            return;
+        }
+
+        const normalizedEmail =
+            email.trim().toLowerCase();
+
+        if (
+            !normalizedEmail ||
+            normalizedEmail ===
+                user.email.toLowerCase()
+        )
+        {
+            return;
+        }
+
+        try
+        {
+            setIsRequestingEmailChange(true);
+
+            await requestProfileEmailChange(
+                normalizedEmail
+            );
+
+            setEmailChangeRequested(true);
+            setVerificationCode('');
+
+            setEmailCodeSent(true);
+
+            setTimeout(() => {
+                setEmailCodeSent(false);
+            }, 3000);
+        }
+        catch (error)
+        {
+            console.error(
+                'ERROR SOLICITANDO CAMBIO DE EMAIL:',
+                error
+            );
+        }
+        finally
+        {
+            setIsRequestingEmailChange(false);
+        }
+    };
+
+    const handleVerifyEmailChange = async () =>
+    {
+        const normalizedCode =
+            verificationCode.trim();
+
+        if (!/^\d{6}$/.test(normalizedCode))
+        {
+            return;
+        }
+
+        try
+        {
+            setIsSaving(true);
+
+            await verifyProfileEmailChange(
+                normalizedCode
+            );
+
+            setEmailChangeRequested(false);
+            setVerificationCode('');
+
+            setEmailChangeSuccess(true);
+
+            setTimeout(() => {
+                setEmailChangeSuccess(false);
+            }, 3000);
+        }
+        catch (error)
+        {
+            console.error(
+                'ERROR VERIFICANDO CAMBIO DE EMAIL:',
+                error
+            );
+        }
+        finally
+        {
+            setIsSaving(false);
         }
     };
 
@@ -190,6 +296,73 @@ export default function EditProfileScreen()
                         autoCapitalize="none"
                         keyboardType="email-address"
                     />
+
+                    {user &&
+                        email.trim().toLowerCase() !==
+                            user.email.toLowerCase() &&
+                        !emailChangeRequested && (
+                            <TouchableOpacity
+                                style={styles.verifyEmailButton}
+                                onPress={handleRequestEmailChange}
+                                disabled={isRequestingEmailChange}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.verifyEmailButtonText}>
+                                    {isRequestingEmailChange
+                                        ? 'Enviando código...'
+                                        : 'Verificar nuevo email'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                    {emailCodeSent && (
+                        <Text style={styles.successText}>
+                            ✓ Código enviado al nuevo email
+                        </Text>
+                    )}
+
+                    {emailChangeRequested && (
+                        <View style={styles.emailVerificationContainer}>
+                            <Text style={styles.emailVerificationText}>
+                                Ingresá el código de 6 dígitos que enviamos a:
+                            </Text>
+
+                            <Text style={styles.pendingEmailText}>
+                                {email.trim().toLowerCase()}
+                            </Text>
+
+                            <TextInput
+                                style={styles.input}
+                                value={verificationCode}
+                                onChangeText={setVerificationCode}
+                                placeholder="Código de 6 dígitos"
+                                keyboardType="number-pad"
+                                maxLength={6}
+                            />
+
+                            <TouchableOpacity
+                                style={styles.confirmEmailButton}
+                                onPress={handleVerifyEmailChange}
+                                disabled={
+                                    isSaving ||
+                                    verificationCode.trim().length !== 6
+                                }
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.confirmEmailButtonText}>
+                                    {isSaving
+                                        ? 'Verificando...'
+                                        : 'Confirmar email'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {emailChangeSuccess && (
+                        <Text style={styles.successText}>
+                            ✓ Email actualizado correctamente
+                        </Text>
+                    )}
                 </View>
 
                 <TouchableOpacity
@@ -308,5 +481,57 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#2E7D32',
+    },
+
+    verifyEmailButton: {
+        marginTop: 8,
+        alignSelf: 'flex-start',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#6B3A22',
+    },
+
+    verifyEmailButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B3A22',
+    },
+
+    emailVerificationContainer: {
+        marginTop: 12,
+        padding: 14,
+        borderRadius: 10,
+        backgroundColor: '#F8F1E9',
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+    },
+
+    emailVerificationText: {
+        fontSize: 13,
+        color: '#7A6254',
+    },
+
+    pendingEmailText: {
+        marginTop: 4,
+        marginBottom: 10,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#4A2416',
+    },
+
+    confirmEmailButton: {
+        marginTop: 10,
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderRadius: 8,
+        backgroundColor: '#6B3A22',
+    },
+
+    confirmEmailButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
 });
