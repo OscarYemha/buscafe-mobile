@@ -1,4 +1,5 @@
 import {
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -40,114 +41,124 @@ export default function AccountScreen()
                 style={styles.container}
                 edges={['left', 'right']}
             >
-                <View style={styles.content}>
-                    <Text style={styles.title}>
-                        Mi cuenta
-                    </Text>
-
-                    <Text style={styles.description}>
-                        Iniciá sesión para guardar tus cafeterías
-                        favoritas, publicar reseñas y acceder a tu
-                        perfil.
-                    </Text>
-
-                    <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={() =>
-                            navigation.navigate('Login')
-                        }
-                    >
-                        <Text style={styles.primaryButtonText}>
-                            Iniciar sesión
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.content}>
+                        <Text style={styles.title}>
+                            Mi cuenta
                         </Text>
-                    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.registerButton}
-                        onPress={() =>
-                            navigation.navigate('Register')
-                        }
-                    >
-                        <Text style={styles.registerButtonText}>
-                            Crear cuenta
+                        <Text style={styles.description}>
+                            Iniciá sesión para guardar tus cafeterías
+                            favoritas, publicar reseñas y acceder a tu
+                            perfil.
                         </Text>
-                    </TouchableOpacity>
-                </View>
+
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() =>
+                                navigation.navigate('Login')
+                            }
+                        >
+                            <Text style={styles.primaryButtonText}>
+                                Iniciar sesión
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.registerButton}
+                            onPress={() =>
+                                navigation.navigate('Register')
+                            }
+                        >
+                            <Text style={styles.registerButtonText}>
+                                Crear cuenta
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
             </SafeAreaView>
         );
     }
 
     return (
         <SafeAreaView
-            style={styles.container}
-            edges={['left', 'right']}
-        >
-            <View style={styles.content}>
-                <Text style={styles.title}>
-                    Mi cuenta
-                </Text>
-
-                <View style={styles.userCard}>
-                    <Text style={styles.name}>
-                        {user.name}
+                style={styles.container}
+                edges={['left', 'right']}
+            >
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.content}>
+                    <Text style={styles.title}>
+                        Mi cuenta
                     </Text>
 
-                    <Text style={styles.email}>
-                        {user.email}
-                    </Text>
-                </View>
+                    <View style={styles.userCard}>
+                        <Text style={styles.name}>
+                            {user.name}
+                        </Text>
 
-                <View style={styles.section}>
+                        <Text style={styles.email}>
+                            {user.email}
+                        </Text>
+                    </View>
+
+                    <View style={styles.section}>
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                navigation.navigate('EditProfile');
+                            }}
+                        >
+                            <Text style={styles.menuIcon}>
+                                ♙
+                            </Text>
+
+                            <Text style={styles.menuText}>
+                                Editar perfil
+                            </Text>
+
+                            <Text style={styles.chevron}>
+                                ›
+                            </Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.menuDivider} />
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                navigation.navigate('Favorites');
+                            }}
+                        >
+                            <Text style={styles.menuIcon}>
+                                ♡
+                            </Text>
+
+                            <Text style={styles.menuText}>
+                                Cafés favoritos
+                            </Text>
+
+                            <Text style={styles.chevron}>
+                                ›
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
                     <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() => {
-                            navigation.navigate('EditProfile');
-                        }}
+                        style={styles.logoutButton}
+                        onPress={logout}
                     >
-                        <Text style={styles.menuIcon}>
-                            ♙
-                        </Text>
-
-                        <Text style={styles.menuText}>
-                            Editar perfil
-                        </Text>
-
-                        <Text style={styles.chevron}>
-                            ›
+                        <Text style={styles.logoutButtonText}>
+                            Cerrar sesión
                         </Text>
                     </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() => {
-                            navigation.navigate('Favorites');
-                        }}
-                    >
-                        <Text style={styles.menuIcon}>
-                            ♡
-                        </Text>
-
-                        <Text style={styles.menuText}>
-                            Cafés favoritos
-                        </Text>
-
-                        <Text style={styles.chevron}>
-                            ›
-                        </Text>
-                    </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity
-                    style={styles.logoutButton}
-                    onPress={logout}
-                >
-                    <Text style={styles.logoutButtonText}>
-                        Cerrar sesión
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -162,6 +173,11 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 20,
         paddingTop: 20,
+    },
+
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 24,
     },
 
     title: {

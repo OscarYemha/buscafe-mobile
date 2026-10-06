@@ -1,5 +1,6 @@
 import {
     Image,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -239,150 +240,156 @@ export default function EditProfileScreen()
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                <View style={styles.avatarContainer}>
-                    {selectedImageUri || user.avatarUrl ? (
-                        <Image
-                            source={{
-                                uri:
-                                    selectedImageUri ??
-                                    user.avatarUrl!,
-                            }}
-                            style={styles.avatar}
-                        />
-                    ) : (
-                        <View style={styles.avatarFallback}>
-                            <Text style={styles.avatarInitial}>
-                                {initial}
-                            </Text>
-                        </View>
-                    )}
-
-                    <TouchableOpacity
-                        style={styles.changePhotoButton}
-                        onPress={pickImage}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={styles.changePhotoText}>
-                        {selectedImageUri || user.avatarUrl
-                            ? 'Cambiar foto'
-                            : 'Agregar foto'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.field}>
-                    <Text style={styles.label}>
-                        Nombre
-                    </Text>
-
-                    <TextInput
-                        style={styles.input}
-                        value={name}
-                        onChangeText={setName}
-                        autoCapitalize="words"
-                    />
-                </View>
-
-                <View style={styles.field}>
-                    <Text style={styles.label}>
-                        Email
-                    </Text>
-
-                    <TextInput
-                        style={styles.input}
-                        value={email}
-                        onChangeText={setEmail}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                    />
-
-                    {user &&
-                        email.trim().toLowerCase() !==
-                            user.email.toLowerCase() &&
-                        !emailChangeRequested && (
-                            <TouchableOpacity
-                                style={styles.verifyEmailButton}
-                                onPress={handleRequestEmailChange}
-                                disabled={isRequestingEmailChange}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.verifyEmailButtonText}>
-                                    {isRequestingEmailChange
-                                        ? 'Enviando código...'
-                                        : 'Verificar nuevo email'}
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.content}>
+                    <View style={styles.avatarContainer}>
+                        {selectedImageUri || user.avatarUrl ? (
+                            <Image
+                                source={{
+                                    uri:
+                                        selectedImageUri ??
+                                        user.avatarUrl!,
+                                }}
+                                style={styles.avatar}
+                            />
+                        ) : (
+                            <View style={styles.avatarFallback}>
+                                <Text style={styles.avatarInitial}>
+                                    {initial}
                                 </Text>
-                            </TouchableOpacity>
+                            </View>
                         )}
 
-                    {emailCodeSent && (
-                        <Text style={styles.successText}>
-                            ✓ Código enviado al nuevo email
+                        <TouchableOpacity
+                            style={styles.changePhotoButton}
+                            onPress={pickImage}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.changePhotoText}>
+                            {selectedImageUri || user.avatarUrl
+                                ? 'Cambiar foto'
+                                : 'Agregar foto'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.label}>
+                            Nombre
                         </Text>
-                    )}
 
-                    {emailChangeRequested && (
-                        <View style={styles.emailVerificationContainer}>
-                            <Text style={styles.emailVerificationText}>
-                                Ingresá el código de 6 dígitos que enviamos a:
+                        <TextInput
+                            style={styles.input}
+                            value={name}
+                            onChangeText={setName}
+                            autoCapitalize="words"
+                        />
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.label}>
+                            Email
+                        </Text>
+
+                        <TextInput
+                            style={styles.input}
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
+                        />
+
+                        {user &&
+                            email.trim().toLowerCase() !==
+                                user.email.toLowerCase() &&
+                            !emailChangeRequested && (
+                                <TouchableOpacity
+                                    style={styles.verifyEmailButton}
+                                    onPress={handleRequestEmailChange}
+                                    disabled={isRequestingEmailChange}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.verifyEmailButtonText}>
+                                        {isRequestingEmailChange
+                                            ? 'Enviando código...'
+                                            : 'Verificar nuevo email'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+
+                        {emailCodeSent && (
+                            <Text style={styles.successText}>
+                                ✓ Código enviado al nuevo email
                             </Text>
+                        )}
 
-                            <Text style={styles.pendingEmailText}>
-                                {email.trim().toLowerCase()}
-                            </Text>
-
-                            <TextInput
-                                style={styles.input}
-                                value={verificationCode}
-                                onChangeText={setVerificationCode}
-                                placeholder="Código de 6 dígitos"
-                                keyboardType="number-pad"
-                                maxLength={6}
-                            />
-
-                            <TouchableOpacity
-                                style={styles.confirmEmailButton}
-                                onPress={handleVerifyEmailChange}
-                                disabled={
-                                    isSaving ||
-                                    verificationCode.trim().length !== 6
-                                }
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.confirmEmailButtonText}>
-                                    {isSaving
-                                        ? 'Verificando...'
-                                        : 'Confirmar email'}
+                        {emailChangeRequested && (
+                            <View style={styles.emailVerificationContainer}>
+                                <Text style={styles.emailVerificationText}>
+                                    Ingresá el código de 6 dígitos que enviamos a:
                                 </Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
 
-                    {emailChangeSuccess && (
+                                <Text style={styles.pendingEmailText}>
+                                    {email.trim().toLowerCase()}
+                                </Text>
+
+                                <TextInput
+                                    style={styles.input}
+                                    value={verificationCode}
+                                    onChangeText={setVerificationCode}
+                                    placeholder="Código de 6 dígitos"
+                                    keyboardType="number-pad"
+                                    maxLength={6}
+                                />
+
+                                <TouchableOpacity
+                                    style={styles.confirmEmailButton}
+                                    onPress={handleVerifyEmailChange}
+                                    disabled={
+                                        isSaving ||
+                                        verificationCode.trim().length !== 6
+                                    }
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.confirmEmailButtonText}>
+                                        {isSaving
+                                            ? 'Verificando...'
+                                            : 'Confirmar email'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {emailChangeSuccess && (
+                            <Text style={styles.successText}>
+                                ✓ Email actualizado correctamente
+                            </Text>
+                        )}
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.saveButton}
+                        onPress={handleSave}
+                        disabled={isSaving}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.saveButtonText}>
+                            {isSaving
+                                ? 'Guardando...'
+                                : 'Guardar cambios'}
+                        </Text>
+                    </TouchableOpacity>
+                    {saveSuccess && (
                         <Text style={styles.successText}>
-                            ✓ Email actualizado correctamente
+                            ✓ Cambios guardados correctamente
                         </Text>
                     )}
                 </View>
-
-                <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={handleSave}
-                    disabled={isSaving}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.saveButtonText}>
-                        {isSaving
-                            ? 'Guardando...'
-                            : 'Guardar cambios'}
-                    </Text>
-                </TouchableOpacity>
-                {saveSuccess && (
-                    <Text style={styles.successText}>
-                        ✓ Cambios guardados correctamente
-                    </Text>
-                )}
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -397,6 +404,11 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 20,
         paddingTop: 24,
+    },
+
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 24,
     },
 
     avatarContainer: {
@@ -484,19 +496,19 @@ const styles = StyleSheet.create({
     },
 
     verifyEmailButton: {
-        marginTop: 8,
-        alignSelf: 'flex-start',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        marginTop: 10,
+        alignSelf: 'center',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 18,
         borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#6B3A22',
+        backgroundColor: '#6B3A22',
     },
 
     verifyEmailButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#6B3A22',
+        color: '#FFFFFF',
     },
 
     emailVerificationContainer: {
@@ -527,6 +539,8 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 8,
         backgroundColor: '#6B3A22',
+        alignSelf: 'center',
+        paddingHorizontal: 18,
     },
 
     confirmEmailButtonText: {
