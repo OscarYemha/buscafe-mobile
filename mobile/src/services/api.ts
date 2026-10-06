@@ -1,6 +1,7 @@
 import { CafeSummary } from "../types/CafeSummary";
 import { CafeDetail } from "../types/CafeDetail";
 import * as SecureStore from 'expo-secure-store';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const API_URL =
     process.env.EXPO_PUBLIC_API_URL ??
@@ -358,48 +359,31 @@ export async function uploadAvatar(
     imageUri: string
 ): Promise<AuthUser>
 {
-    const formData = new FormData();
+    const uploadResult =
+        await FileSystem.uploadAsync(
+            `${API_URL}/users/me/avatar`,
+            imageUri,
+            {
+                httpMethod: 'PATCH',
+                uploadType:
+                    FileSystem.FileSystemUploadType.MULTIPART,
+                fieldName: 'avatar',
+                headers: {
+                    Authorization:
+                        `Bearer ${token}`,
+                },
+            }
+        );
 
-    const fileName =
-        imageUri.split('/').pop() ??
-        'avatar.jpg';
+    const data =
+        uploadResult.body
+            ? JSON.parse(uploadResult.body)
+            : {};
 
-    const extension =
-        fileName
-            .split('.')
-            .pop()
-            ?.toLowerCase();
-
-    const mimeType =
-        extension === 'png'
-            ? 'image/png'
-            : extension === 'webp'
-                ? 'image/webp'
-                : 'image/jpeg';
-
-    formData.append(
-        'avatar',
-        {
-            uri: imageUri,
-            name: fileName,
-            type: mimeType,
-        } as any
-    );
-
-    const response = await fetch(
-        `${API_URL}/users/me/avatar`,
-        {
-            method: 'PATCH',
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-        }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok)
+    if (
+        uploadResult.status < 200 ||
+        uploadResult.status >= 300
+    )
     {
         throw new Error(
             data.error ??

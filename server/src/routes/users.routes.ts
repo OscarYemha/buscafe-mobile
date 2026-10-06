@@ -161,7 +161,7 @@ router.patch(
                 .getPublicUrl(filePath);
 
             const avatarUrl =
-                publicUrlData.publicUrl;
+                `${publicUrlData.publicUrl}?v=${Date.now()}`;
 
             const user =
                 await prisma.user.update({
