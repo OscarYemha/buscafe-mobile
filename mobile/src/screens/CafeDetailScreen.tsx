@@ -71,7 +71,10 @@ export default function CafeDetailScreen({ route, navigation }: Props)
     if (loading)
     {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView
+                style={styles.container}
+                edges={['left', 'right', 'bottom']}
+            >
                 <Text style={styles.title}>
                     Cargando cafetería...
                 </Text>
@@ -82,7 +85,10 @@ export default function CafeDetailScreen({ route, navigation }: Props)
     if (error || !cafe)
     {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView
+                style={styles.container}
+                edges={['left', 'right', 'bottom']}
+            >
                 <Text style={styles.title}>
                     {error ?? 'Cafetería no encontrada'}
                 </Text>
@@ -134,7 +140,10 @@ export default function CafeDetailScreen({ route, navigation }: Props)
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView
+            style={styles.container}
+            edges={['left', 'right', 'bottom']}
+        >
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -337,7 +346,7 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                             >
                                 <View style={styles.reviewHeader}>
                                     <Text style={styles.reviewUser}>
-                                        {review.user.name}
+                                        {review.user?.name ?? 'Usuario eliminado'}
                                     </Text>
 
                                     <Text style={styles.reviewRating}>

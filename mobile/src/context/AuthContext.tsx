@@ -8,6 +8,8 @@ import {
 import * as SecureStore from 'expo-secure-store';
 import {
     AuthUser,
+    changePassword,
+    deleteAccount,
     getCurrentUser,
     loginUser,
     registerUser,
@@ -58,6 +60,15 @@ type AuthContextType = {
 
     updateUser: (
         updatedUser: AuthUser
+    ) => Promise<void>;
+
+    changeProfilePassword: (
+        currentPassword: string,
+        newPassword: string
+    ) => Promise<void>;
+
+    deleteProfileAccount: (
+        password: string
     ) => Promise<void>;
 
     logout: () => Promise<void>;
@@ -274,6 +285,60 @@ export function AuthProvider({children, }: {children: ReactNode})
         await updateUser(updatedUser);
     };
 
+    const changeProfilePassword = async (
+        currentPassword: string,
+        newPassword: string
+    ) => {
+        const token =
+            await SecureStore.getItemAsync(
+                TOKEN_KEY
+            );
+
+        if (!token)
+        {
+            throw new Error(
+                'No hay una sesión activa'
+            );
+        }
+
+        await changePassword(
+            token,
+            currentPassword,
+            newPassword
+        );
+    };
+
+    const deleteProfileAccount = async (
+        password: string
+    ) => {
+        const token =
+            await SecureStore.getItemAsync(
+                TOKEN_KEY
+            );
+
+        if (!token)
+        {
+            throw new Error(
+                'No hay una sesión activa'
+            );
+        }
+
+        await deleteAccount(
+            token,
+            password
+        );
+
+        await SecureStore.deleteItemAsync(
+            TOKEN_KEY
+        );
+
+        await SecureStore.deleteItemAsync(
+            USER_KEY
+        );
+
+        setUser(null);
+    };
+
     const updateUser = async (
         updatedUser: AuthUser
     ) => {
@@ -310,6 +375,8 @@ export function AuthProvider({children, }: {children: ReactNode})
                 verifyProfileEmailChange,
                 updateAvatar,
                 updateProfileName,
+                changeProfilePassword,
+                deleteProfileAccount,
                 updateUser,
                 logout,
             }}

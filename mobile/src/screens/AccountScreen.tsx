@@ -15,6 +15,7 @@ import {
     AccountStackParamList,
     RootStackParamlist,
 } from '../navigation/AppNavigator';
+import { Ionicons } from '@expo/vector-icons';
 
 type AccountNavigation =
     NativeStackNavigationProp<
@@ -114,9 +115,12 @@ export default function AccountScreen()
                                 navigation.navigate('EditProfile');
                             }}
                         >
-                            <Text style={styles.menuIcon}>
-                                ♙
-                            </Text>
+                            <Ionicons
+                                name="person-outline"
+                                size={24}
+                                color="#6B3A22"
+                                style={styles.menuIcon}
+                            />
 
                             <Text style={styles.menuText}>
                                 Editar perfil
@@ -132,12 +136,39 @@ export default function AccountScreen()
                         <TouchableOpacity
                             style={styles.menuItem}
                             onPress={() => {
+                                navigation.navigate('ChangePassword');
+                            }}
+                        >
+                            <Ionicons
+                                name="lock-closed-outline"
+                                size={24}
+                                color="#6B3A22"
+                                style={styles.menuIcon}
+                            />
+
+                            <Text style={styles.menuText}>
+                                Cambiar contraseña
+                            </Text>
+
+                            <Text style={styles.chevron}>
+                                ›
+                            </Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.menuDivider} />
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
                                 navigation.navigate('Favorites');
                             }}
                         >
-                            <Text style={styles.menuIcon}>
-                                ♡
-                            </Text>
+                            <Ionicons
+                                name="heart-outline"
+                                size={24}
+                                color="#6B3A22"
+                                style={styles.menuIcon}
+                            />
 
                             <Text style={styles.menuText}>
                                 Cafés favoritos
@@ -155,6 +186,22 @@ export default function AccountScreen()
                     >
                         <Text style={styles.logoutButtonText}>
                             Cerrar sesión
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.deleteAccountButton}
+                        onPress={() => {
+                            navigation.navigate('DeleteAccount');
+                        }}
+                    >
+                        <Ionicons
+                            name="trash-outline"
+                            size={22}
+                            color="#FFFFFF"
+                        />
+
+                        <Text style={styles.deleteAccountButtonText}>
+                            Eliminar cuenta
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -232,8 +279,7 @@ const styles = StyleSheet.create({
 
     menuIcon: {
         width: 28,
-        fontSize: 22,
-        color: '#6B3A22',
+        marginRight: 6,
     },
 
     menuText: {
@@ -294,5 +340,22 @@ const styles = StyleSheet.create({
     menuDivider: {
         height: 1,
         backgroundColor: '#E8D9C7',
+    },
+
+    deleteAccountButton: {
+        marginTop: 14,
+        paddingVertical: 14,
+        borderRadius: 14,
+        backgroundColor: '#B3261E',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+
+    deleteAccountButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

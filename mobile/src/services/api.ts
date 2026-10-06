@@ -386,6 +386,128 @@ export async function updateProfile(
     return data;
 }
 
+export async function changePassword(
+    token: string,
+    currentPassword: string,
+    newPassword: string
+): Promise<void>
+{
+    const response = await fetch(
+        `${API_URL}/users/me/password`,
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                currentPassword,
+                newPassword,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo actualizar la contraseña'
+        );
+    }
+}
+
+export async function deleteAccount(
+    token: string,
+    password: string
+): Promise<void>
+{
+    const response = await fetch(
+        `${API_URL}/users/me`,
+        {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                password,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo eliminar la cuenta'
+        );
+    }
+}
+
+export async function requestPasswordReset(
+    email: string
+): Promise<void>
+{
+    const response = await fetch(
+        `${API_URL}/users/password-reset/request`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo iniciar la recuperación de contraseña'
+        );
+    }
+}
+
+export async function confirmPasswordReset(
+    email: string,
+    code: string,
+    newPassword: string
+): Promise<void>
+{
+    const response = await fetch(
+        `${API_URL}/users/password-reset/confirm`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+                code,
+                newPassword,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok)
+    {
+        throw new Error(
+            data.error ??
+            'No se pudo restablecer la contraseña'
+        );
+    }
+}
+
 export async function requestEmailChange(
     token: string,
     email: string

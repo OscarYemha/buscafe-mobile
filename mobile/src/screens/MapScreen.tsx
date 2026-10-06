@@ -63,6 +63,7 @@ export default function MapScreen(
     const [error, setError] = useState<string | null>(null);
     const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
+    const [selectedCafePoint, setSelectedCafePoint] = useState<{ x: number; y: number } | null>(null);
     const waitingForLocationSettings = useRef(false);
     const mapRef = useRef<MapView>(null);
     const listRef = useRef<FlatList<CafeSummary>>(null);
@@ -76,6 +77,7 @@ export default function MapScreen(
         useCallback(() => {
             return () => {
                 setSelectedCafeId(null);
+                setSelectedCafePoint(null);
 
                 listRef.current?.scrollToOffset({
                     offset: 0,
@@ -106,6 +108,34 @@ export default function MapScreen(
                 cafe.googlePlaceId === selectedCafeId
         ) ?? null
         : null;
+
+    async function updateSelectedCafePoint(
+        cafe: CafeSummary
+    )
+    {
+        if (!mapRef.current)
+        {
+            return;
+        }
+
+        try
+        {
+            const point =
+                await mapRef.current.pointForCoordinate({
+                    latitude: cafe.latitude,
+                    longitude: cafe.longitude,
+                });
+
+            setSelectedCafePoint(point);
+        }
+        catch (error)
+        {
+            console.error(
+                'Error al calcular la posición del café seleccionado',
+                error
+            );
+        }
+    }
 
     function calculateDistanceMeters(
         from: UserLocation,
@@ -196,6 +226,7 @@ export default function MapScreen(
             {
                 setCafes(nearbyCafes);
                 setSelectedCafeId(null);
+                setSelectedCafePoint(null);
 
                 listRef.current?.scrollToOffset({
                     offset: 0,
@@ -348,6 +379,7 @@ export default function MapScreen(
                                 {
                                     setCafes(nearbyCafes);
                                     setSelectedCafeId(null);
+                                    setSelectedCafePoint(null);
 
                                     listRef.current?.scrollToOffset({
                                         offset: 0,
@@ -506,11 +538,23 @@ export default function MapScreen(
                             }}
                             showsUserLocation
                             showsMyLocationButton
+                            onRegionChangeComplete={() => {
+                                if (selectedCafe)
+                                {
+                                    updateSelectedCafePoint(
+                                        selectedCafe
+                                    );
+                                }
+                            }}
                         >
                             {sortedCafes.map((cafe) => (
                                 <Marker
                                     key={cafe.googlePlaceId}
-                                    pinColor="#6B3A22"
+                                    image={
+                                        selectedCafeId === cafe.googlePlaceId
+                                            ? require('../../assets/cafe-marker-selected.png')
+                                            : require('../../assets/cafe-marker.png')
+                                    }
                                     coordinate={{
                                         latitude: cafe.latitude,
                                         longitude: cafe.longitude,
@@ -559,8 +603,26 @@ export default function MapScreen(
                                 />
                             ))}
                         </MapView>
-                        {selectedCafe && (
-                            <View style={styles.selectedCafeCard}>
+                        {selectedCafe && selectedCafePoint && (
+                            <TouchableOpacity
+                                style={[
+                                    styles.selectedCafeCard,
+                                    {
+                                        left: selectedCafePoint.x,
+                                        top: selectedCafePoint.y,
+                                    },
+                                ]}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                    navigation.navigate(
+                                        'CafeDetail',
+                                        {
+                                            googlePlaceId:
+                                                selectedCafe.googlePlaceId,
+                                        }
+                                    );
+                                }}
+                            >
                                 <Text style={styles.selectedCafeName}>
                                     {selectedCafe.name}
                                 </Text>
@@ -586,7 +648,9 @@ export default function MapScreen(
                                         ? selectedCafe.buscafeRating.toFixed(1)
                                         : 'Sin puntuación'}
                                 </Text>
-                            </View>
+
+                                <View style={styles.selectedCafeArrow} />
+                            </TouchableOpacity>
                         )}
                         <View style={styles.listContainer}>
                             <Text style={styles.listTitle}>
@@ -757,10 +821,7 @@ const styles = StyleSheet.create({
 
     selectedCafeCard: {
         position: 'absolute',
-        alignSelf: 'center',
-        maxWidth: '85%',
-        minWidth: 210,
-        bottom: 216,
+        width: 240,
         zIndex: 10,
         backgroundColor: '#FFFFFF',
         borderRadius: 10,
@@ -769,6 +830,25 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E8D9C7',
         elevation: 5,
+        transform: [
+            { translateX: -120 },
+            { translateY: -135 },
+        ],
+    },
+
+    selectedCafeArrow: {
+        position: 'absolute',
+        bottom: -9,
+        left: 110,
+        width: 18,
+        height: 18,
+        backgroundColor: '#FFFFFF',
+        borderRightWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: '#E8D9C7',
+        transform: [
+            { rotate: '45deg' },
+        ],
     },
 
     selectedCafeName: {

@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -33,20 +33,12 @@ export default function RegisterScreen({
 {
     const { register } = useAuth();
 
-    const [name, setName] =
-        useState('');
-
-    const [email, setEmail] =
-        useState('');
-
-    const [password, setPassword] =
-        useState('');
-
-    const [error, setError] =
-        useState<string | null>(null);
-
-    const [isLoading, setIsLoading] =
-        useState(false);
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleRegister = async () => {
         if (
@@ -113,7 +105,10 @@ export default function RegisterScreen({
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView
+            style={styles.container}
+            edges={['left', 'right', 'bottom']}
+        >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -152,17 +147,39 @@ export default function RegisterScreen({
                             editable={!isLoading}
                         />
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Contraseña"
-                            placeholderTextColor="#9A8578"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!isLoading}
-                        />
+                        <View style={styles.passwordContainer}>
+                            <TextInput
+                                style={styles.passwordInput}
+                                placeholder="Contraseña"
+                                placeholderTextColor="#9A8578"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry={!showPassword}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!isLoading}
+                            />
+
+                            <TouchableOpacity
+                                style={styles.eyeButton}
+                                onPress={() =>
+                                    setShowPassword(
+                                        (value) => !value
+                                    )
+                                }
+                                disabled={isLoading}
+                            >
+                                <Ionicons
+                                    name={
+                                        showPassword
+                                            ? 'eye-off-outline'
+                                            : 'eye-outline'
+                                    }
+                                    size={22}
+                                    color="#7A6254"
+                                />
+                            </TouchableOpacity>
+                        </View>
                         <Text style={styles.passwordHint}>
                             Mínimo 8 caracteres. Para mayor seguridad, combiná letras, números y símbolos.
                         </Text>
@@ -290,5 +307,28 @@ const styles = StyleSheet.create({
         fontSize: 12,
         lineHeight: 17,
         color: '#7A6254',
+    },
+
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+        borderRadius: 14,
+        marginBottom: 14,
+    },
+
+    passwordInput: {
+        flex: 1,
+        paddingLeft: 14,
+        paddingVertical: 13,
+        fontSize: 15,
+        color: '#4A2416',
+    },
+
+    eyeButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
     },
 });

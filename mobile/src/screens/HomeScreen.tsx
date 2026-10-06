@@ -107,7 +107,6 @@ export default function HomeScreen({navigation}: Props) {
 
   const [cafes, setCafes] = useState<CafeSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshingLocation, setRefreshingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
@@ -187,121 +186,61 @@ export default function HomeScreen({navigation}: Props) {
     }
   }
 
-async function updateNearbyCafesFromLocation(
-  location: UserLocation
-)
-{
-  setUserLocation(location);
-
-  const nearbyCafes =
-    await getNearbyCafes(
-      location.latitude,
-      location.longitude
-    );
-
-  setCafes(nearbyCafes);
-}
-
-async function autoRefreshNearbyCafes(
-  location: UserLocation
-)
-{
-  const now = Date.now();
-
-  if (autoRefreshInProgressRef.current)
-  {
-    return;
-  }
-
-  if (
-    now - lastAutoRefreshRef.current <
-    AUTO_REFRESH_COOLDOWN_MS
+  async function updateNearbyCafesFromLocation(
+    location: UserLocation
   )
   {
-    return;
+    setUserLocation(location);
+
+    const nearbyCafes =
+      await getNearbyCafes(
+        location.latitude,
+        location.longitude
+      );
+
+    setCafes(nearbyCafes);
   }
 
-  try
+  async function autoRefreshNearbyCafes(
+    location: UserLocation
+  )
   {
-    autoRefreshInProgressRef.current = true;
-    lastAutoRefreshRef.current = now;
+    const now = Date.now();
 
-    await updateNearbyCafesFromLocation(
-      location
-    );
-  }
-  catch (error)
-  {
-    console.error(
-      'Error al actualizar cafés automáticamente:',
-      error
-    );
-  }
-  finally
-  {
-    autoRefreshInProgressRef.current = false;
-  }
-}
-
-  async function refreshNearbyCafes()
-{
-  try
-  {
-    setRefreshingLocation(true);
-    setError(null);
-
-    let location =
-      selectedLocationRef.current;
-
-    if (!location)
+    if (autoRefreshInProgressRef.current)
     {
-      const result =
-        await getCurrentLocation();
-
-      if (result.status === 'denied')
-      {
-        setCanAskLocationAgain(
-          result.canAskAgain
-        );
-
-        setError(
-          result.canAskAgain
-            ? 'Necesitamos tu ubicación para mostrar cafeterías cercanas.'
-            : 'El acceso a tu ubicación está desactivado. Habilitalo desde los ajustes del teléfono para ver las cafeterías cercanas.'
-        );
-
-        return;
-      }
-
-      location = result.location;
-
-      selectedLocationRef.current =
-        location;
+      return;
     }
 
-    setCanAskLocationAgain(true);
+    if (
+      now - lastAutoRefreshRef.current <
+      AUTO_REFRESH_COOLDOWN_MS
+    )
+    {
+      return;
+    }
 
-    await updateNearbyCafesFromLocation(
-      location
-    );
+    try
+    {
+      autoRefreshInProgressRef.current = true;
+      lastAutoRefreshRef.current = now;
 
+      await updateNearbyCafesFromLocation(
+        location
+      );
+    }
+    catch (error)
+    {
+      console.error(
+        'Error al actualizar cafés automáticamente:',
+        error
+      );
+    }
+    finally
+    {
+      autoRefreshInProgressRef.current = false;
+    }
   }
-  catch (error)
-  {
-    console.error(
-      'Error al actualizar las cafeterías cercanas:',
-      error
-    );
-
-    setError(
-      'No se pudieron actualizar las cafeterías cercanas.'
-    );
-  }
-  finally
-  {
-    setRefreshingLocation(false);
-  }
-}
 
   useEffect(() => {
     const subscription =
@@ -524,29 +463,9 @@ async function autoRefreshNearbyCafes(
                 </TouchableOpacity>
             ))}
           </View>
-          <View style={styles.nearbyHeader}>
-              <Text style={styles.nearbyTitle}>
-                  Cafés cerca de vos
-              </Text>
-
-              {!loading && !error && (
-                  <TouchableOpacity
-                      style={[
-                          styles.refreshButton,
-                          refreshingLocation &&
-                              styles.refreshButtonDisabled,
-                      ]}
-                      onPress={refreshNearbyCafes}
-                      disabled={refreshingLocation}
-                  >
-                      <Text style={styles.refreshButtonText}>
-                          {refreshingLocation
-                              ? 'Actualizando...'
-                              : '↻  Actualizar cafés'}
-                      </Text>
-                  </TouchableOpacity>
-              )}
-          </View>
+          <Text style={styles.sectionTitle}>
+            Cafés cerca de vos
+          </Text>
           {loading && (
             <Text style={styles.message}>
               Buscando cafeterías cercanas...
@@ -790,38 +709,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
-  },
-
-    nearbyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 28,
-    marginBottom: 14,
-  },
-
-  nearbyTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#4A2416',
-  },
-
-  refreshButton: {
-    marginLeft: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#6B3A22',
-  },
-
-  refreshButtonDisabled: {
-    opacity: 0.6,
-  },
-
-  refreshButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
 });

@@ -18,6 +18,10 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { NavigatorScreenParams } from '@react-navigation/native';
 import SearchScreen from '../screens/SearchScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
+import DeleteAccountScreen from '../screens/DeleteAccountScreen';
 
 export type RootStackParamlist = {
     Main: NavigatorScreenParams<MainTabParamList>;
@@ -42,6 +46,12 @@ export type RootStackParamlist = {
     VerifyEmail: {
         email: string;
     }
+    ForgotPassword: {
+        email?: string;
+    };
+    ResetPassword: {
+        email: string;
+    };
 };
 
 export type MainTabParamList = {
@@ -54,6 +64,8 @@ export type AccountStackParamList = {
     AccountHome: undefined;
     Favorites: undefined;
     EditProfile: undefined;
+    ChangePassword: undefined;
+    DeleteAccount: undefined;
 };
 
 const Stack =
@@ -98,6 +110,22 @@ function AccountNavigator()
                 component={EditProfileScreen}
                 options={{
                     title: 'Editar perfil',
+                }}
+            />
+
+            <AccountStack.Screen
+                name="ChangePassword"
+                component={ChangePasswordScreen}
+                options={{
+                    title: 'Cambiar contraseña',
+                }}
+            />
+
+            <AccountStack.Screen
+                name="DeleteAccount"
+                component={DeleteAccountScreen}
+                options={{
+                    title: 'Eliminar cuenta',
                 }}
             />
         </AccountStack.Navigator>
@@ -217,6 +245,7 @@ function MainTabs({ navigation }: MainTabsProps)
                     component={AccountNavigator}
                     options={{
                         title: 'Mi cuenta',
+                        popToTopOnBlur: true,
                     }}
                 />
             </Tab.Navigator>
@@ -292,6 +321,21 @@ export default function AppNavigator()
                 component={VerifyEmailScreen}
                 options={{
                     title: 'Verificar email',
+                }}
+            />
+            <Stack.Screen
+                name="ForgotPassword"
+                component={ForgotPasswordScreen}
+                options={{
+                    title: 'Recuperar contraseña',
+                }}
+            />
+
+            <Stack.Screen
+                name="ResetPassword"
+                component={ResetPasswordScreen}
+                options={{
+                    title: 'Nueva contraseña',
                 }}
             />
         </Stack.Navigator>

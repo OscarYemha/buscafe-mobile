@@ -91,7 +91,10 @@ export default function ResultsScreen({ route, navigation }: Props) {
         : 'Cafés cerca de vos';
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView
+            style={styles.container}
+            edges={['left', 'right', 'bottom']}
+        >
             <View>
                 <Text style={styles.title}>{title}</Text>
                 <Text style={styles.subtitle}>

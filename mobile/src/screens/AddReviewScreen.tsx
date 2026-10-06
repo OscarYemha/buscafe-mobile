@@ -1,4 +1,6 @@
 import {
+    ActivityIndicator,
+    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -15,6 +17,7 @@ import { useReviewDraft } from '../context/ReviewDraftContext';
 import { useAuth } from '../context/AuthContext';
 import { createReview } from '../services/api';
 import { useReviews } from '../context/ReviewsContext';
+import { useState } from 'react';
 
 type Props = NativeStackScreenProps<
     RootStackParamlist,
@@ -34,6 +37,8 @@ export default function AddReviewScreen({ route, navigation }: Props) {
     const {draft, setDraft, clearDraft} = useReviewDraft();
     const {user, isAuthenticated} = useAuth();
     const { notifyReviewsChanged } = useReviews();
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const isCurrentCafeDraft = draft.cafeId === googlePlaceId;
 
@@ -331,6 +336,8 @@ export default function AddReviewScreen({ route, navigation }: Props) {
 
         try
         {
+            setIsSubmitting(true);
+
             await createReview({
                 googlePlaceId,
                 cafeName,
@@ -368,7 +375,18 @@ export default function AddReviewScreen({ route, navigation }: Props) {
 
             clearDraft();
             notifyReviewsChanged();
-            navigation.goBack();
+            Alert.alert(
+                'Reseña publicada',
+                'Tu reseña se publicó correctamente.',
+                [
+                    {
+                        text: 'Aceptar',
+                        onPress: () => {
+                            navigation.goBack();
+                        },
+                    },
+                ]
+            );
         }
         catch (error)
         {
@@ -376,11 +394,25 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                 'Error al publicar la reseña:',
                 error
             );
+
+            Alert.alert(
+                'No se pudo publicar la reseña',
+                error instanceof Error
+                    ? error.message
+                    : 'Ocurrió un error inesperado'
+            );
+        }
+        finally
+        {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView
+            style={styles.container}
+            edges={['left', 'right', 'bottom']}
+        >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -586,14 +618,28 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
-                                !canSubmit && styles.submitButtonDisabled,
+                                (!canSubmit || isSubmitting) &&
+                                    styles.submitButtonDisabled,
                             ]}
-                            disabled={!canSubmit}
+                            disabled={!canSubmit || isSubmitting}
                             onPress={handleSubmit}
                         >
-                            <Text style={styles.submitButtonText}>
-                                Publicar reseña
-                            </Text>
+                            {isSubmitting ? (
+                                <View style={styles.submittingContent}>
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="#FFFFFF"
+                                    />
+
+                                    <Text style={styles.submitButtonText}>
+                                        Publicando...
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.submitButtonText}>
+                                    Publicar reseña
+                                </Text>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -783,5 +829,11 @@ const styles = StyleSheet.create({
 
     recommendationsSection: {
         marginTop: 28,
+    },
+
+    submittingContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
 });

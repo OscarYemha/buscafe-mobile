@@ -9,6 +9,7 @@ import {
 } from "../middleware/auth.js";
 import {
     sendEmailChangeVerification,
+    sendPasswordResetEmail,
     sendVerificationEmail
 } from '../services/email.js';
 import { randomInt } from 'node:crypto';
@@ -164,6 +165,235 @@ router.patch(
 
             return res.status(500).json({
                 error: 'No se pudo actualizar el perfil',
+            });
+        }
+    }
+);
+
+router.patch(
+    '/me/password',
+    requireAuth,
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        try
+        {
+            const userId = req.userId;
+
+            const {
+                currentPassword,
+                newPassword,
+            } = req.body;
+
+            if (!userId)
+            {
+                return res.status(401).json({
+                    error: 'Autenticación requerida',
+                });
+            }
+
+            if (
+                typeof currentPassword !== 'string' ||
+                currentPassword === '' ||
+                typeof newPassword !== 'string'
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'La contraseña actual y la nueva son obligatorias',
+                });
+            }
+
+            if (newPassword.length < 8)
+            {
+                return res.status(400).json({
+                    error:
+                        'La nueva contraseña debe tener al menos 8 caracteres',
+                });
+            }
+
+            if (currentPassword === newPassword)
+            {
+                return res.status(400).json({
+                    error:
+                        'La nueva contraseña debe ser diferente a la actual',
+                });
+            }
+
+            const user =
+                await prisma.user.findUnique({
+                    where: {
+                        id: userId,
+                    },
+                    select: {
+                        passwordHash: true,
+                    },
+                });
+
+            if (!user)
+            {
+                return res.status(404).json({
+                    error: 'Usuario no encontrado',
+                });
+            }
+
+            const currentPasswordIsValid =
+                await bcrypt.compare(
+                    currentPassword,
+                    user.passwordHash
+                );
+
+            if (!currentPasswordIsValid)
+            {
+                return res.status(401).json({
+                    error:
+                        'La contraseña actual es incorrecta',
+                });
+            }
+
+            const newPasswordHash =
+                await bcrypt.hash(
+                    newPassword,
+                    10
+                );
+
+            await prisma.user.update({
+                where: {
+                    id: userId,
+                },
+                data: {
+                    passwordHash:
+                        newPasswordHash,
+                },
+            });
+
+            return res.json({
+                message:
+                    'Contraseña actualizada correctamente',
+            });
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error:
+                    'No se pudo actualizar la contraseña',
+            });
+        }
+    }
+);
+
+router.delete(
+    '/me',
+    requireAuth,
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        try
+        {
+            const userId = req.userId;
+            const { password } = req.body;
+
+            if (!userId)
+            {
+                return res.status(401).json({
+                    error: 'Autenticación requerida',
+                });
+            }
+
+            if (
+                typeof password !== 'string' ||
+                password === ''
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'La contraseña actual es obligatoria',
+                });
+            }
+
+            const user =
+                await prisma.user.findUnique({
+                    where: {
+                        id: userId,
+                    },
+                    select: {
+                        passwordHash: true,
+                        avatarUrl: true,
+                    },
+                });
+
+            if (!user)
+            {
+                return res.status(404).json({
+                    error: 'Usuario no encontrado',
+                });
+            }
+
+            const passwordIsValid =
+                await bcrypt.compare(
+                    password,
+                    user.passwordHash
+                );
+
+            if (!passwordIsValid)
+            {
+                return res.status(401).json({
+                    error:
+                        'La contraseña actual es incorrecta',
+                });
+            }
+
+            await prisma.user.delete({
+                where: {
+                    id: userId,
+                },
+            });
+
+            if (user.avatarUrl)
+            {
+                const avatarExtensions = [
+                    'jpg',
+                    'png',
+                    'webp',
+                ];
+
+                const avatarPaths =
+                    avatarExtensions.map(
+                        (extension) =>
+                            `users/${userId}/avatar.${extension}`
+                    );
+
+                const {
+                    error: avatarDeleteError,
+                } = await supabase.storage
+                    .from('avatars')
+                    .remove(avatarPaths);
+
+                if (avatarDeleteError)
+                {
+                    console.error(
+                        'No se pudo eliminar el avatar:',
+                        avatarDeleteError
+                    );
+                }
+            }
+
+            return res.json({
+                message:
+                    'Cuenta eliminada correctamente',
+            });
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error:
+                    'No se pudo eliminar la cuenta',
             });
         }
     }
@@ -830,6 +1060,197 @@ router.post('/verify-email', async (req, res) => {
         });
     }
 });
+
+router.post(
+    '/password-reset/request',
+    async (req, res) => {
+        try
+        {
+            const { email } = req.body;
+
+            if (
+                typeof email !== 'string' ||
+                email.trim() === '' ||
+                !isValidEmail(email.trim())
+            )
+            {
+                return res.status(400).json({
+                    error: 'Email inválido',
+                });
+            }
+
+            const normalizedEmail =
+                email.trim().toLowerCase();
+
+            const user =
+                await prisma.user.findUnique({
+                    where: {
+                        email: normalizedEmail,
+                    },
+                });
+
+            /*
+             * Respondemos igual aunque el usuario
+             * no exista para no revelar qué emails
+             * están registrados.
+             */
+            if (!user)
+            {
+                return res.json({
+                    message:
+                        'Si existe una cuenta asociada a ese email, recibirás un código para restablecer tu contraseña.',
+                });
+            }
+
+            const code =
+                randomInt(
+                    100000,
+                    1000000
+                ).toString();
+
+            const expiresAt =
+                new Date(
+                    Date.now() +
+                    15 * 60 * 1000
+                );
+
+            await prisma.user.update({
+                where: {
+                    id: user.id,
+                },
+                data: {
+                    passwordResetCode: code,
+                    passwordResetCodeExpires:
+                        expiresAt,
+                },
+            });
+
+            await sendPasswordResetEmail(
+                user.email,
+                code
+            );
+
+            return res.json({
+                message:
+                    'Si existe una cuenta asociada a ese email, recibirás un código para restablecer tu contraseña.',
+            });
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error:
+                    'No se pudo iniciar la recuperación de contraseña',
+            });
+        }
+    }
+);
+
+router.post(
+    '/password-reset/confirm',
+    async (req, res) => {
+        try
+        {
+            const {
+                email,
+                code,
+                newPassword,
+            } = req.body;
+
+            if (
+                typeof email !== 'string' ||
+                email.trim() === '' ||
+                !isValidEmail(email.trim()) ||
+                typeof code !== 'string' ||
+                !/^\d{6}$/.test(code) ||
+                typeof newPassword !== 'string' ||
+                newPassword.length < 8
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'Los datos para restablecer la contraseña son inválidos',
+                });
+            }
+
+            const normalizedEmail =
+                email.trim().toLowerCase();
+
+            const user =
+                await prisma.user.findUnique({
+                    where: {
+                        email: normalizedEmail,
+                    },
+                });
+
+            if (
+                !user ||
+                !user.passwordResetCode ||
+                !user.passwordResetCodeExpires
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'El código es inválido o venció',
+                });
+            }
+
+            if (
+                user.passwordResetCodeExpires <
+                new Date()
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'El código es inválido o venció',
+                });
+            }
+
+            if (
+                user.passwordResetCode !== code
+            )
+            {
+                return res.status(400).json({
+                    error:
+                        'El código es inválido o venció',
+                });
+            }
+
+            const passwordHash =
+                await bcrypt.hash(
+                    newPassword,
+                    10
+                );
+
+            await prisma.user.update({
+                where: {
+                    id: user.id,
+                },
+                data: {
+                    passwordHash,
+                    passwordResetCode: null,
+                    passwordResetCodeExpires:
+                        null,
+                },
+            });
+
+            return res.json({
+                message:
+                    'Contraseña restablecida correctamente',
+            });
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            return res.status(500).json({
+                error:
+                    'No se pudo restablecer la contraseña',
+            });
+        }
+    }
+);
 
 router.post('/login', async (req, res) => {
     try

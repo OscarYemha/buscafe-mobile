@@ -25,6 +25,8 @@ model User {
   emailChangeCode          String?
   emailChangeCodeExpires   DateTime?
   avatarUrl                String?
+  passwordResetCode        String?
+  passwordResetCodeExpires DateTime?
 
   reviews   Review[]
   favorites Favorite[]
@@ -59,10 +61,10 @@ model Review {
   goodForStudy Boolean?
   goodForDate  Boolean?
 
-  userId Int
+  userId Int?
   cafeId Int
 
-  user User @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   cafe Cafe @relation(fields: [cafeId], references: [id])
 
   @@index([cafeId])

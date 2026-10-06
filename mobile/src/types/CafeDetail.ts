@@ -19,7 +19,7 @@ export type CafeReview = {
     user: {
         id: number;
         name: string;
-    };
+    } | null;
 };
 
 export type CafeDetail = CafeSummary & {

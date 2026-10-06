@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamlist } from '../navigation/AppNavigator';
 import { EmailVerificationRequiredError } from '../services/api';
+import { Ionicons } from '@expo/vector-icons';
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'Login'>;
 
@@ -23,6 +24,7 @@ export default function LoginScreen( {navigation}: Props) {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -46,7 +48,17 @@ export default function LoginScreen( {navigation}: Props) {
                 password
             );
 
-            navigation.goBack();
+            navigation.reset({
+                index: 0,
+                routes: [
+                    {
+                        name: 'Main',
+                        params: {
+                            screen: 'Home',
+                        },
+                    },
+                ],
+            });
         }
         catch (error)
         {
@@ -75,7 +87,10 @@ export default function LoginScreen( {navigation}: Props) {
     };
     
         return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView
+            style={styles.container}
+            edges={['left', 'right', 'bottom']}
+        >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -106,17 +121,61 @@ export default function LoginScreen( {navigation}: Props) {
                                 editable={!isLoading}
                             />
 
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Contraseña"
-                                placeholderTextColor="#9A8578"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                editable={!isLoading}
-                            />
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={styles.passwordInput}
+                                    placeholder="Contraseña"
+                                    placeholderTextColor="#9A8578"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    editable={!isLoading}
+                                />
+
+                                <TouchableOpacity
+                                    style={styles.eyeButton}
+                                    onPress={() =>
+                                        setShowPassword(
+                                            (value) => !value
+                                        )
+                                    }
+                                    disabled={isLoading}
+                                >
+                                    <Ionicons
+                                        name={
+                                            showPassword
+                                                ? 'eye-off-outline'
+                                                : 'eye-outline'
+                                        }
+                                        size={22}
+                                        color="#7A6254"
+                                    />
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.forgotPasswordLink}
+                                onPress={() =>
+                                    navigation.navigate(
+                                        'ForgotPassword',
+                                        {
+                                            email:
+                                                email.trim().toLowerCase(),
+                                        }
+                                    )
+                                }
+                                disabled={isLoading}
+                            >
+                                <Text
+                                    style={
+                                        styles.forgotPasswordLinkText
+                                    }
+                                >
+                                    ¿Olvidaste tu contraseña?
+                                </Text>
+                            </TouchableOpacity>
 
                             {error && (
                                 <Text style={styles.error}>
@@ -238,5 +297,41 @@ const styles = StyleSheet.create({
         color: '#6B3A22',
         fontSize: 14,
         fontWeight: '600',
+    },
+
+    forgotPasswordLink: {
+        alignSelf: 'flex-end',
+        marginTop: -4,
+        marginBottom: 18,
+        paddingVertical: 4,
+    },
+
+    forgotPasswordLinkText: {
+        color: '#6B3A22',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+        borderRadius: 14,
+        marginBottom: 14,
+    },
+
+    passwordInput: {
+        flex: 1,
+        paddingLeft: 14,
+        paddingVertical: 13,
+        fontSize: 15,
+        color: '#4A2416',
+    },
+
+    eyeButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
     },
 });
