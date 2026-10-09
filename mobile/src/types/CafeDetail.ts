@@ -1,3 +1,4 @@
+
 import { CafeSummary } from './CafeSummary';
 
 export type CafeReview = {
@@ -45,6 +46,56 @@ export type CafeDetail = CafeSummary & {
     website: string | null;
     phone: string | null;
     googleMapsUrl: string | null;
+
+    // Servicios y modalidades de atención
+    delivery: boolean | null;
+    takeout: boolean | null;
+    dineIn: boolean | null;
+    curbsidePickup: boolean | null;
+    outdoorSeating: boolean | null;
+    reservable: boolean | null;
+
+    // Comidas y bebidas
+    servesBreakfast: boolean | null;
+    servesBrunch: boolean | null;
+    servesLunch: boolean | null;
+    servesDinner: boolean | null;
+    servesCoffee: boolean | null;
+    servesDessert: boolean | null;
+    servesVegetarianFood: boolean | null;
+
+    // Instalaciones y ambiente
+    restroom: boolean | null;
+    liveMusic: boolean | null;
+    goodForChildren: boolean | null;
+    menuForChildren: boolean | null;
+
+    // Accesibilidad
+    accessibilityOptions: {
+        wheelchairAccessibleEntrance?: boolean;
+        wheelchairAccessibleParking?: boolean;
+        wheelchairAccessibleRestroom?: boolean;
+        wheelchairAccessibleSeating?: boolean;
+    } | null;
+
+    // Estacionamiento
+    parkingOptions: {
+        freeParkingLot?: boolean;
+        paidParkingLot?: boolean;
+        freeStreetParking?: boolean;
+        paidStreetParking?: boolean;
+        valetParking?: boolean;
+        freeGarageParking?: boolean;
+        paidGarageParking?: boolean;
+    } | null;
+
+    // Medios de pago
+    paymentOptions: {
+        acceptsCreditCards?: boolean;
+        acceptsDebitCards?: boolean;
+        acceptsCashOnly?: boolean;
+        acceptsNfc?: boolean;
+    } | null;
 
     photos: {
         name: string;

@@ -11,8 +11,7 @@ module.exports = {
             [
                 'expo-splash-screen',
                 {
-                    image:
-                        './assets/buscafe-splash-transparent.png',
+                    image: './assets/buscafe-splash-recortado.png',
                     imageWidth: 315,
                     resizeMode: 'contain',
                     backgroundColor: '#F3E4C8',

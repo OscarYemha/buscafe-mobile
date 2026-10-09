@@ -440,6 +440,41 @@ router.get('/place/:googlePlaceId', async (req, res) => {
             googleMapsUrl:
                 googlePlace.googleMapsUri ?? null,
 
+            // Servicios y modalidades de atención
+            delivery: googlePlace.delivery ?? null,
+            takeout: googlePlace.takeout ?? null,
+            dineIn: googlePlace.dineIn ?? null,
+            curbsidePickup: googlePlace.curbsidePickup ?? null,
+            outdoorSeating: googlePlace.outdoorSeating ?? null,
+            reservable: googlePlace.reservable ?? null,
+
+            // Comidas y bebidas
+            servesBreakfast: googlePlace.servesBreakfast ?? null,
+            servesBrunch: googlePlace.servesBrunch ?? null,
+            servesLunch: googlePlace.servesLunch ?? null,
+            servesDinner: googlePlace.servesDinner ?? null,
+            servesCoffee: googlePlace.servesCoffee ?? null,
+            servesDessert: googlePlace.servesDessert ?? null,
+            servesVegetarianFood: googlePlace.servesVegetarianFood ?? null,
+
+            // Instalaciones y ambiente
+            restroom: googlePlace.restroom ?? null,
+            liveMusic: googlePlace.liveMusic ?? null,
+            goodForChildren: googlePlace.goodForChildren ?? null,
+            menuForChildren: googlePlace.menuForChildren ?? null,
+
+            // Accesibilidad
+            accessibilityOptions:
+                googlePlace.accessibilityOptions ?? null,
+
+            // Estacionamiento
+            parkingOptions:
+                googlePlace.parkingOptions ?? null,
+
+            // Medios de pago
+            paymentOptions:
+                googlePlace.paymentOptions ?? null,
+
             photos: photos.filter(
                 (photo) => photo !== null
             ),

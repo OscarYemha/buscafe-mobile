@@ -382,6 +382,7 @@ export default function MapScreen(
                             longitudeDelta: 0.02,
                         }}
                         showsUserLocation
+                        showsMyLocationButton={false}
                         onLayout={(event) => {
                             const { width, height } = event.nativeEvent.layout;
 

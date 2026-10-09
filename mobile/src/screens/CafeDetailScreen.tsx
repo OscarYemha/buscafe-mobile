@@ -19,9 +19,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamlist } from '../navigation/AppNavigator';
 import { getCafeDetails } from '../services/api';
 import { CafeDetail } from '../types/CafeDetail';
+import CafeServices from '../components/CafeServices';
 import { priceLabels } from '../utils/price';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { classifyExternalLink } from '../utils/externalLinks';
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'CafeDetail'>;
 
@@ -298,12 +300,19 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                                 ? '● Cerrado'
                                 : 'Horario no disponible'}
                     </Text>
-                    {cafe.currentOpeningHours.length > 0 && (
+                    {(
+                        cafe.currentOpeningHours.length > 0 ||
+                        cafe.regularOpeningHours.length > 0
+                    ) && (
                         <>
                             <Text style={styles.sectionTitle}>
                                 Horarios
                             </Text>
-                            {cafe.currentOpeningHours.map(
+                            {(
+                                cafe.currentOpeningHours.length > 0
+                                    ? cafe.currentOpeningHours
+                                    : cafe.regularOpeningHours
+                            ).map(
                                 (hours) => (
                                     <Text
                                         key={hours}
@@ -325,12 +334,15 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                     </Text>
                     <Text style={styles.infoPets}>
                         {cafe.allowsDogs === true
-                            ? '🐕 Acepta mascotas'
+                            ? '🐕 Acepta perros'
                             : cafe.allowsDogs === false
-                                ? '🚫🐕 No acepta mascotas'
-                                : '🐕 Mascotas: información no disponible'}
+                                ? '🚫🐕 No acepta perros'
+                                : '🐕 Perros: información no disponible'}
                     </Text>
                 </View>
+
+                <CafeServices cafe={cafe} />
+
                 {(
                     cafe.coffeeRating !== null ||
                     cafe.foodRating !== null ||
@@ -513,26 +525,32 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                         ✍️ Escribir una reseña
                     </Text>
                 </TouchableOpacity>
-                {(cafe.website ||
-                    cafe.phone ||
-                    cafe.googleMapsUrl) && (
+                {(classifyExternalLink(cafe.website ?? '') ||
+                    cafe.phone) && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>
                             Contacto
                         </Text>
                         <View style={styles.contactContainer}>
-                            {cafe.website && (
-                                <TouchableOpacity
-                                    style={styles.contactButton}
-                                    onPress={() =>
-                                        Linking.openURL(cafe.website!)
+                            {cafe.website &&
+                                (() => {
+                                    const link = classifyExternalLink(cafe.website);
+
+                                    if (!link) {
+                                        return null;
                                     }
-                                >
-                                    <Text style={styles.contactButtonText}>
-                                        🌐 Sitio web
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
+
+                                    return (
+                                        <TouchableOpacity
+                                            style={styles.contactButton}
+                                            onPress={() => Linking.openURL(link.url)}
+                                        >
+                                            <Text style={styles.contactButtonText}>
+                                                {link.icon} {link.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })()}
                             {cafe.phone && (
                                 <TouchableOpacity
                                     style={styles.contactButton}
@@ -547,26 +565,18 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                                     </Text>
                                 </TouchableOpacity>
                             )}
-                            {cafe.googleMapsUrl && (
-                                <TouchableOpacity
-                                    style={styles.contactButton}
-                                    onPress={() =>
-                                        Linking.openURL(
-                                            cafe.googleMapsUrl!
-                                        )
-                                    }
-                                >
-                                    <Text style={styles.contactButtonText}>
-                                        🗺️ Google Maps
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
                         </View>
                     </View>
                 )}
                 <TouchableOpacity
-                style={styles.directionsButton}
-                onPress={openDirections}
+                    style={styles.directionsButton}
+                    onPress={() => {
+                        if (cafe.googleMapsUrl) {
+                            Linking.openURL(cafe.googleMapsUrl);
+                        } else {
+                            openDirections();
+                        }
+                    }}
                 >
                     <Text style={styles.directionsButtonText}>
                         📍 Cómo llegar

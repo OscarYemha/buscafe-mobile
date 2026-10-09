@@ -569,6 +569,39 @@ export async function getPlaceDetails(
                     'websiteUri',
                     'nationalPhoneNumber',
                     'googleMapsUri',
+
+                    // Servicios y modalidades de atención
+                    'delivery',
+                    'takeout',
+                    'dineIn',
+                    'curbsidePickup',
+                    'outdoorSeating',
+                    'reservable',
+
+                    // Comidas y bebidas
+                    'servesBreakfast',
+                    'servesBrunch',
+                    'servesLunch',
+                    'servesDinner',
+                    'servesCoffee',
+                    'servesDessert',
+                    'servesVegetarianFood',
+
+                    // Instalaciones y ambiente
+                    'restroom',
+                    'liveMusic',
+                    'goodForChildren',
+                    'menuForChildren',
+
+                    // Accesibilidad
+                    'accessibilityOptions',
+
+                    // Estacionamiento
+                    'parkingOptions',
+
+                    // Medios de pago
+                    'paymentOptions',
+
                     'photos',
                 ].join(','),
             },

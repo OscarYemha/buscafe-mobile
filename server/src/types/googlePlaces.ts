@@ -1,3 +1,4 @@
+
 export type GooglePlace = {
     id: string;
 
@@ -51,10 +52,58 @@ export type GooglePlace = {
     };
 
     websiteUri?: string;
-
     nationalPhoneNumber?: string;
-
     googleMapsUri?: string;
+
+    // Servicios y modalidades de atención
+    delivery?: boolean;
+    takeout?: boolean;
+    dineIn?: boolean;
+    curbsidePickup?: boolean;
+    outdoorSeating?: boolean;
+    reservable?: boolean;
+
+    // Comidas y bebidas
+    servesBreakfast?: boolean;
+    servesBrunch?: boolean;
+    servesLunch?: boolean;
+    servesDinner?: boolean;
+    servesCoffee?: boolean;
+    servesDessert?: boolean;
+    servesVegetarianFood?: boolean;
+
+    // Instalaciones y ambiente
+    restroom?: boolean;
+    liveMusic?: boolean;
+    goodForChildren?: boolean;
+    menuForChildren?: boolean;
+
+    // Accesibilidad
+    accessibilityOptions?: {
+        wheelchairAccessibleEntrance?: boolean;
+        wheelchairAccessibleParking?: boolean;
+        wheelchairAccessibleRestroom?: boolean;
+        wheelchairAccessibleSeating?: boolean;
+    };
+
+    // Estacionamiento
+    parkingOptions?: {
+        freeParkingLot?: boolean;
+        paidParkingLot?: boolean;
+        freeStreetParking?: boolean;
+        paidStreetParking?: boolean;
+        valetParking?: boolean;
+        freeGarageParking?: boolean;
+        paidGarageParking?: boolean;
+    };
+
+    // Medios de pago
+    paymentOptions?: {
+        acceptsCreditCards?: boolean;
+        acceptsDebitCards?: boolean;
+        acceptsCashOnly?: boolean;
+        acceptsNfc?: boolean;
+    };
 
     photos?: {
         name: string;
