@@ -45,4 +45,16 @@ export type CafeDetail = CafeSummary & {
     website: string | null;
     phone: string | null;
     googleMapsUrl: string | null;
+
+    photos: {
+        name: string;
+        url: string;
+        widthPx: number | null;
+        heightPx: number | null;
+        authorAttributions: {
+            displayName: string;
+            uri: string;
+            photoUri?: string;
+        }[];
+    }[];
 };

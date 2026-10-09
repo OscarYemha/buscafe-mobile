@@ -1,4 +1,5 @@
 import {
+    Alert,
     Image,
     ScrollView,
     StyleSheet,
@@ -11,9 +12,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AccountStackParamList } from '../navigation/AppNavigator';
+
+type EditProfileNavigation =
+    NativeStackNavigationProp<
+        AccountStackParamList,
+        'EditProfile'
+    >;
 
 export default function EditProfileScreen()
 {
+    const navigation =
+    useNavigation<EditProfileNavigation>();
+
     const {
         user,
         requestProfileEmailChange,
@@ -131,6 +144,13 @@ export default function EditProfileScreen()
                 'ERROR SOLICITANDO CAMBIO DE EMAIL:',
                 error
             );
+
+            Alert.alert(
+                'No se pudo solicitar el cambio de email',
+                error instanceof Error
+                    ? error.message
+                    : 'Ocurrió un error inesperado. Intentá nuevamente.'
+            );
         }
         finally
         {
@@ -163,13 +183,21 @@ export default function EditProfileScreen()
 
             setTimeout(() => {
                 setEmailChangeSuccess(false);
-            }, 3000);
+                navigation.popToTop();
+            }, 2000);
         }
         catch (error)
         {
             console.error(
                 'ERROR VERIFICANDO CAMBIO DE EMAIL:',
                 error
+            );
+
+            Alert.alert(
+                'No se pudo verificar el nuevo email',
+                error instanceof Error
+                    ? error.message
+                    : 'Ocurrió un error inesperado. Intentá nuevamente.'
             );
         }
         finally
@@ -223,13 +251,21 @@ export default function EditProfileScreen()
 
             setTimeout(() => {
                 setSaveSuccess(false);
-            }, 3000);
+                navigation.popToTop();
+            }, 2000);
         }
         catch (error)
         {
             console.error(
                 'ERROR ACTUALIZANDO PERFIL:',
                 error
+            );
+
+            Alert.alert(
+                'No se pudieron guardar todos los cambios',
+                error instanceof Error
+                    ? error.message
+                    : 'Ocurrió un error inesperado. Intentá nuevamente.'
             );
         }
         finally
@@ -370,6 +406,7 @@ export default function EditProfileScreen()
                         {emailChangeSuccess && (
                             <Text style={styles.successText}>
                                 ✓ Email actualizado correctamente
+                                {'\n'}Redirigiendo a Mi cuenta...
                             </Text>
                         )}
                     </View>
@@ -390,6 +427,7 @@ export default function EditProfileScreen()
                     {saveSuccess && (
                         <Text style={styles.successText}>
                             ✓ Cambios guardados correctamente
+                            {'\n'}Redirigiendo a Mi cuenta...
                         </Text>
                     )}
                 </View>

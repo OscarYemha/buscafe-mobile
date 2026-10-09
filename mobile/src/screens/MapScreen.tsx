@@ -1,6 +1,5 @@
 import {
     ActivityIndicator,
-    AppState,
     FlatList,
     Linking,
     StyleSheet,
@@ -15,12 +14,8 @@ import {
     useState,
 } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker } from 'react-native-maps';
-import {
-    getCurrentLocation,
-    watchUserLocation,
-    UserLocation,
-} from '../services/location';
+import MapView, { Marker, Region } from 'react-native-maps';
+import { useNearbyCafes } from '../context/NearbyCafesContext';
 import { getNearbyCafes } from '../services/api';
 import { CafeSummary } from '../types/CafeSummary';
 import {
@@ -50,28 +45,35 @@ type Props = CompositeScreenProps<
     NativeStackScreenProps<RootStackParamlist>
 >;
 
-const MOVEMENT_THRESHOLD_METERS = 50;
-const AUTO_REFRESH_COOLDOWN_MS = 10000;
-
 export default function MapScreen(
     { navigation }: Props
 )
 {
-    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-    const [cafes, setCafes] = useState<CafeSummary[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
+    const {
+        userLocation,
+        cafes,
+        loading,
+        error,
+        canAskLocationAgain,
+        refreshNearbyCafes,
+        markWaitingForLocationSettings,
+    } = useNearbyCafes();
+
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
     const [selectedCafePoint, setSelectedCafePoint] = useState<{ x: number; y: number } | null>(null);
-    const waitingForLocationSettings = useRef(false);
+    const [exploredRegion, setExploredRegion] = useState<Region | null>(null);
+    const [showSearchAreaButton, setShowSearchAreaButton] = useState(false);
+    const [explorationCafes, setExplorationCafes] = useState<CafeSummary[] | null>(null);
+    const [explorationLoading, setExplorationLoading] = useState(false);
+    const [explorationError, setExplorationError] = useState<string | null>(null);
+    const [mapSize, setMapSize] = useState({width: 0, height: 0,});
+
     const mapRef = useRef<MapView>(null);
     const listRef = useRef<FlatList<CafeSummary>>(null);
-    const selectedLocationRef = useRef<UserLocation | null>(null);
-    const movementCandidateRef = useRef<UserLocation | null>(null);
-    const lastAutoRefreshRef = useRef(0);
-    const autoRefreshInProgressRef = useRef(false);
-    const cafesRequestIdRef = useRef(0);
+    const programmaticMovementRef = useRef(false);
+    const isMapGestureActiveRef = useRef(false);
+    const isExploringMapRef = useRef(false);
+    const explorationRequestIdRef = useRef(0);
 
     useFocusEffect(
         useCallback(() => {
@@ -87,7 +89,14 @@ export default function MapScreen(
         }, [])
     );
 
-    const sortedCafes = [...cafes].sort((a, b) => {
+    const displayedCafes = explorationCafes ?? cafes;
+
+    const sortedCafes = [...displayedCafes].sort((a, b) => {
+        if (a.distanceKm === null && b.distanceKm === null)
+        {
+            return 0;
+        }
+
         if (a.distanceKm === null)
         {
             return 1;
@@ -108,6 +117,30 @@ export default function MapScreen(
                 cafe.googlePlaceId === selectedCafeId
         ) ?? null
         : null;
+
+    const CARD_WIDTH = 240;
+    const CARD_HEIGHT = 135;
+    const MAP_MARGIN = 12;
+
+    const selectedCardPosition =
+        selectedCafePoint && mapSize.width > 0 && mapSize.height > 0
+            ? {
+                left: Math.max(
+                    CARD_WIDTH / 2 + MAP_MARGIN,
+                    Math.min(
+                        selectedCafePoint.x,
+                        mapSize.width - CARD_WIDTH / 2 - MAP_MARGIN
+                    )
+                ),
+                top: Math.max(
+                    CARD_HEIGHT + MAP_MARGIN,
+                    Math.min(
+                        selectedCafePoint.y,
+                        mapSize.height - MAP_MARGIN
+                    )
+                ),
+            }
+            : null;
 
     async function updateSelectedCafePoint(
         cafe: CafeSummary
@@ -137,312 +170,128 @@ export default function MapScreen(
         }
     }
 
-    function calculateDistanceMeters(
-        from: UserLocation,
-        to: UserLocation
-    ): number
+    useEffect(() => {
+        if (
+            !userLocation ||
+            !mapRef.current ||
+            isMapGestureActiveRef.current ||
+            isExploringMapRef.current ||
+            explorationCafes !== null ||
+            showSearchAreaButton
+        )
+        {
+            return;
+        }
+
+        programmaticMovementRef.current = true;
+
+        mapRef.current.animateToRegion(
+            {
+                latitude: userLocation.latitude,
+                longitude: userLocation.longitude,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+            },
+            350
+        );
+    }, [userLocation]);
+
+    async function searchInThisArea()
     {
-        const earthRadiusMeters = 6371000;
+        if (!exploredRegion || explorationLoading)
+        {
+            return;
+        }
 
-        const lat1 =
-            from.latitude * Math.PI / 180;
+        const requestId =
+            ++explorationRequestIdRef.current;
 
-        const lat2 =
-            to.latitude * Math.PI / 180;
+        setExplorationLoading(true);
+        setExplorationError(null);
+        setShowSearchAreaButton(false);
 
-        const deltaLat =
-            (to.latitude - from.latitude) *
-            Math.PI / 180;
-
-        const deltaLon =
-            (to.longitude - from.longitude) *
-            Math.PI / 180;
-
-        const a =
-            Math.sin(deltaLat / 2) ** 2 +
-            Math.cos(lat1) *
-            Math.cos(lat2) *
-            Math.sin(deltaLon / 2) ** 2;
-
-        const c =
-            2 *
-            Math.atan2(
-                Math.sqrt(a),
-                Math.sqrt(1 - a)
-            );
-
-        return earthRadiusMeters * c;
-    }
-
-    async function loadMap()
-    {
         try
         {
-            setLoading(true);
-            setError(null);
+            const nearbyCafes = await getNearbyCafes(
+                exploredRegion.latitude,
+                exploredRegion.longitude
+            );
 
-            const locationResult =
-                await getCurrentLocation();
-
-            if (locationResult.status === 'denied')
+            if (requestId !== explorationRequestIdRef.current)
             {
-                setUserLocation(null);
-
-                setCanAskLocationAgain(
-                    locationResult.canAskAgain
-                );
-
-                setError(
-                    locationResult.canAskAgain
-                        ? 'Necesitamos tu ubicación para mostrar cafeterías cercanas.'
-                        : 'El acceso a tu ubicación está desactivado. Habilitalo desde los ajustes del teléfono para explorar cafeterías cercanas.'
-                );
-
                 return;
             }
 
-            setCanAskLocationAgain(true);
+            setExplorationCafes(nearbyCafes);
+            setSelectedCafeId(null);
+            setSelectedCafePoint(null);
 
-            const location = locationResult.location;
-
-            setUserLocation(location);
-
-            selectedLocationRef.current = location;
-            movementCandidateRef.current = null;
-
-            const requestId =
-                ++cafesRequestIdRef.current;
-
-            const nearbyCafes =
-                await getNearbyCafes(
-                    location.latitude,
-                    location.longitude
-                );
-
-            if (
-                requestId ===
-                cafesRequestIdRef.current
-            )
-            {
-                setCafes(nearbyCafes);
-                setSelectedCafeId(null);
-                setSelectedCafePoint(null);
-
-                listRef.current?.scrollToOffset({
-                    offset: 0,
-                    animated: false,
-                });
-            }
+            listRef.current?.scrollToOffset({
+                offset: 0,
+                animated: false,
+            });
         }
         catch (error)
         {
             console.error(
-                'Error al cargar el mapa',
+                'Error al buscar cafeterías en esta zona:',
                 error
             );
 
-            setError(
-                'No se pudo cargar el mapa'
-            );
+            if (requestId === explorationRequestIdRef.current)
+            {
+                setExplorationError(
+                    'No se pudieron buscar cafeterías en esta zona.'
+                );
+
+                setShowSearchAreaButton(true);
+            }
         }
         finally
         {
-            setLoading(false);
+            if (requestId === explorationRequestIdRef.current)
+            {
+                setExplorationLoading(false);
+            }
         }
     }
 
-    useEffect(() => {
-        loadMap();
-    }, []);
+    function returnToMyLocation()
+    {
+        isExploringMapRef.current = false;
 
-    useEffect(() => {
-        let subscription:
-            Awaited<
-                ReturnType<typeof watchUserLocation>
-            > | null = null;
+        ++explorationRequestIdRef.current;
 
-        let cancelled = false;
+        setExplorationCafes(null);
+        setExplorationError(null);
+        setExplorationLoading(false);
+        setShowSearchAreaButton(false);
+        setExploredRegion(null);
+        setSelectedCafeId(null);
+        setSelectedCafePoint(null);
 
-        async function startWatching()
+        listRef.current?.scrollToOffset({
+            offset: 0,
+            animated: false,
+        });
+
+        if (!userLocation || !mapRef.current)
         {
-            try
-            {
-                subscription =
-                    await watchUserLocation(
-                        async (location) => {
-                            if (cancelled)
-                            {
-                                return;
-                            }
-
-                            const selectedLocation =
-                                selectedLocationRef.current;
-
-                            if (!selectedLocation)
-                            {
-                                selectedLocationRef.current =
-                                    location;
-
-                                setUserLocation(location);
-
-                                return;
-                            }
-
-                            const distance =
-                                calculateDistanceMeters(
-                                    selectedLocation,
-                                    location
-                                );
-
-                            if (
-                                distance <
-                                MOVEMENT_THRESHOLD_METERS
-                            )
-                            {
-                                movementCandidateRef.current =
-                                    null;
-
-                                return;
-                            }
-
-                            const candidate =
-                                movementCandidateRef.current;
-
-                            if (!candidate)
-                            {
-                                movementCandidateRef.current =
-                                    location;
-
-                                return;
-                            }
-
-                            const candidateDistance =
-                                calculateDistanceMeters(
-                                    candidate,
-                                    location
-                                );
-
-                            if (
-                                candidateDistance >=
-                                MOVEMENT_THRESHOLD_METERS
-                            )
-                            {
-                                movementCandidateRef.current =
-                                    location;
-
-                                return;
-                            }
-
-                            const now = Date.now();
-
-                            if (
-                                autoRefreshInProgressRef.current ||
-                                now -
-                                    lastAutoRefreshRef.current <
-                                    AUTO_REFRESH_COOLDOWN_MS
-                            )
-                            {
-                                return;
-                            }
-
-                            selectedLocationRef.current =
-                                location;
-
-                            movementCandidateRef.current =
-                                null;
-
-                            setUserLocation(location);
-
-                            autoRefreshInProgressRef.current =
-                                true;
-
-                            try
-                            {
-                                const requestId =
-                                    ++cafesRequestIdRef.current;
-
-                                const nearbyCafes =
-                                    await getNearbyCafes(
-                                        location.latitude,
-                                        location.longitude
-                                    );
-
-                                if (cancelled)
-                                {
-                                    return;
-                                }
-
-                                if (
-                                    requestId ===
-                                    cafesRequestIdRef.current
-                                )
-                                {
-                                    setCafes(nearbyCafes);
-                                    setSelectedCafeId(null);
-                                    setSelectedCafePoint(null);
-
-                                    listRef.current?.scrollToOffset({
-                                        offset: 0,
-                                        animated: false,
-                                    });
-                                }
-
-                                lastAutoRefreshRef.current =
-                                    Date.now();
-                            }
-                            catch (error)
-                            {
-                                console.error(
-                                    'Error al actualizar cafeterías por movimiento',
-                                    error
-                                );
-                            }
-                            finally
-                            {
-                                autoRefreshInProgressRef.current =
-                                    false;
-                            }
-                        }
-                    );
-            }
-            catch (error)
-            {
-                console.error(
-                    'Error al seguir la ubicación en el mapa',
-                    error
-                );
-            }
+            return;
         }
 
-        startWatching();
+        programmaticMovementRef.current = true;
 
-        return () => {
-            cancelled = true;
-            subscription?.remove();
-        };
-    }, []);
-
-    useEffect(() => {
-        const subscription =
-            AppState.addEventListener(
-                'change',
-                (nextAppState) => {
-                    if (
-                        nextAppState === 'active' &&
-                        waitingForLocationSettings.current
-                    )
-                    {
-                        waitingForLocationSettings.current = false;
-
-                        loadMap();
-                    }
-                }
-            );
-
-        return () => {
-            subscription.remove();
-        };
-    }, []);
+        mapRef.current.animateToRegion(
+            {
+                latitude: userLocation.latitude,
+                longitude: userLocation.longitude,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+            },
+            350
+        );
+    }
 
     return (
         <SafeAreaView
@@ -459,7 +308,7 @@ export default function MapScreen(
                 </Text>
             </View>
 
-            {loading && (
+            {loading && !userLocation && (
                 <View style={styles.center}>
                     <ActivityIndicator
                         size="large"
@@ -472,7 +321,7 @@ export default function MapScreen(
                 </View>
             )}
 
-            {!loading && error && (
+            {!loading && error && !userLocation && (
                 <View style={styles.center}>
                     <View style={styles.locationCard}>
                         <Text style={styles.error}>
@@ -484,14 +333,12 @@ export default function MapScreen(
                             onPress={() => {
                                 if (canAskLocationAgain)
                                 {
-                                    loadMap();
+                                    void refreshNearbyCafes();
                                 }
                                 else
                                 {
-                                    waitingForLocationSettings.current =
-                                        true;
-
-                                    Linking.openSettings();
+                                    markWaitingForLocationSettings();
+                                    void Linking.openSettings();
                                 }
                             }}
                         >
@@ -509,66 +356,307 @@ export default function MapScreen(
                 </View>
             )}
 
-            {!loading &&
-                !error &&
-                userLocation && (
-                    <View style={styles.mapContent}>
-                        <MapView
-                            ref={mapRef}
-                            style={styles.map}
-                            mapType="standard"
-                            customMapStyle={[
-                                {
-                                    featureType: 'poi',
-                                    elementType: 'all',
-                                    stylers: [
-                                        {
-                                            visibility: 'off',
-                                        },
-                                    ],
-                                },
-                            ]}
-                            initialRegion={{
-                                latitude:
-                                    userLocation.latitude,
-                                longitude:
-                                    userLocation.longitude,
-                                latitudeDelta: 0.02,
-                                longitudeDelta: 0.02,
-                            }}
-                            showsUserLocation
-                            showsMyLocationButton
-                            onRegionChangeComplete={() => {
+            {userLocation && (
+                <View style={styles.mapContent}>
+                    <MapView
+                        ref={mapRef}
+                        style={styles.map}
+                        mapType="standard"
+                        customMapStyle={[
+                            {
+                                featureType: 'poi',
+                                elementType: 'all',
+                                stylers: [
+                                    {
+                                        visibility: 'off',
+                                    },
+                                ],
+                            },
+                        ]}
+                        initialRegion={{
+                            latitude:
+                                userLocation.latitude,
+                            longitude:
+                                userLocation.longitude,
+                            latitudeDelta: 0.02,
+                            longitudeDelta: 0.02,
+                        }}
+                        showsUserLocation
+                        onLayout={(event) => {
+                            const { width, height } = event.nativeEvent.layout;
+
+                            setMapSize({
+                                width,
+                                height,
+                            });
+                        }}
+                        onPress={(event) => {
+                            if (event.nativeEvent.action === 'marker-press') {
+                                return;
+                            }
+
+                            setSelectedCafeId(null);
+                            setSelectedCafePoint(null);
+                        }}
+                        onRegionChange={(_region, details) => {
+                            setSelectedCafePoint(null);
+
+                            if (details?.isGesture === true) {
+                                isMapGestureActiveRef.current = true;
+                            }
+                        }}
+                        onRegionChangeComplete={(
+                            region,
+                            details
+                        ) => {
+                            isMapGestureActiveRef.current = false;
+                            setExploredRegion(region);
+
+                            if (details?.isGesture === true)
+                            {
+                                programmaticMovementRef.current = false;
+                            }
+                            else if (programmaticMovementRef.current)
+                            {
+                                programmaticMovementRef.current = false;
+
                                 if (selectedCafe)
                                 {
-                                    updateSelectedCafePoint(
-                                        selectedCafe
-                                    );
+                                    void updateSelectedCafePoint(selectedCafe);
                                 }
+
+                                return;
+                            }
+
+                            if (details?.isGesture === true)
+                            {
+                                isExploringMapRef.current = true;
+
+                                ++explorationRequestIdRef.current;
+
+                                setExplorationLoading(false);
+                                setExplorationError(null);
+                                setShowSearchAreaButton(true);
+                            }
+
+                            if (selectedCafe)
+                            {
+                                void updateSelectedCafePoint(selectedCafe);
+                            }
+                        }}
+                    >
+                        {sortedCafes.map((cafe) => (
+                            <Marker
+                                key={cafe.googlePlaceId}
+                                image={
+                                    selectedCafeId === cafe.googlePlaceId
+                                        ? require('../../assets/cafe-marker-selected.png')
+                                        : require('../../assets/cafe-marker.png')
+                                }
+                                coordinate={{
+                                    latitude: cafe.latitude,
+                                    longitude: cafe.longitude,
+                                }}
+                                zIndex={
+                                    selectedCafeId === cafe.googlePlaceId
+                                        ? 1000
+                                        : 1
+                                }
+                                onPress={() => {
+                                    const cafeId =
+                                        cafe.googlePlaceId;
+
+                                    setSelectedCafeId(cafeId);
+
+                                    programmaticMovementRef.current = true;
+
+                                    mapRef.current?.animateToRegion(
+                                        {
+                                            latitude: cafe.latitude,
+                                            longitude: cafe.longitude,
+                                            latitudeDelta: 0.01,
+                                            longitudeDelta: 0.01,
+                                        },
+                                        350
+                                    );
+
+                                    requestAnimationFrame(() => {
+                                        const currentIndex =
+                                            sortedCafes.findIndex(
+                                                (item) =>
+                                                    item.googlePlaceId ===
+                                                    cafeId
+                                            );
+
+                                        if (currentIndex < 0)
+                                        {
+                                            return;
+                                        }
+
+                                        listRef.current?.scrollToIndex({
+                                            index: currentIndex,
+                                            animated: true,
+                                            viewPosition: 0.5,
+                                        });
+                                    });
+                                }}
+                            />
+                        ))}
+                    </MapView>
+                    <View
+                        style={styles.mapControls}
+                        pointerEvents="box-none"
+                    >
+                        {showSearchAreaButton && (
+                            <TouchableOpacity
+                                style={styles.searchAreaButton}
+                                onPress={() => {
+                                    void searchInThisArea();
+                                }}
+                                disabled={explorationLoading}
+                            >
+                                <Text style={styles.searchAreaButtonText}>
+                                    Buscar en esta zona
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.recenterButton}
+                            onPress={returnToMyLocation}
+                            accessibilityLabel="Volver a mi ubicación"
+                        >
+                            <Text style={styles.recenterButtonText}>
+                                🎯
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {explorationLoading && (
+                        <View style={styles.explorationStatus}>
+                            <ActivityIndicator
+                                size="small"
+                                color="#6B3A22"
+                            />
+                            <Text>Buscando cafeterías...</Text>
+                        </View>
+                    )}
+
+                    {explorationError && (
+                        <Text style={styles.explorationError}>
+                            {explorationError}
+                        </Text>
+                    )}
+                    {selectedCafe && selectedCardPosition && (
+                        <TouchableOpacity
+                            style={[
+                                styles.selectedCafeCard,
+                                {
+                                    left: selectedCardPosition.left,
+                                    top: selectedCardPosition.top,
+                                },
+                            ]}
+                            activeOpacity={0.85}
+                            onPress={() => {
+                                navigation.navigate(
+                                    'CafeDetail',
+                                    {
+                                        googlePlaceId:
+                                            selectedCafe.googlePlaceId,
+                                    }
+                                );
                             }}
                         >
-                            {sortedCafes.map((cafe) => (
-                                <Marker
-                                    key={cafe.googlePlaceId}
-                                    image={
-                                        selectedCafeId === cafe.googlePlaceId
-                                            ? require('../../assets/cafe-marker-selected.png')
-                                            : require('../../assets/cafe-marker.png')
-                                    }
-                                    coordinate={{
-                                        latitude: cafe.latitude,
-                                        longitude: cafe.longitude,
-                                    }}
-                                    zIndex={
-                                        selectedCafeId === cafe.googlePlaceId
-                                            ? 1000
-                                            : 1
-                                    }
-                                    onPress={() => {
-                                        const cafeId =
-                                            cafe.googlePlaceId;
+                            <Text style={styles.selectedCafeName}>
+                                {selectedCafe.name}
+                            </Text>
 
-                                        setSelectedCafeId(cafeId);
+                            <Text
+                                style={styles.selectedCafeAddress}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                            >
+                                {selectedCafe.shortAddress}
+                            </Text>
+
+                            <Text style={styles.selectedCafeRating}>
+                                Google ⭐{' '}
+                                {selectedCafe.googleRating !== null
+                                    ? selectedCafe.googleRating.toFixed(1)
+                                    : 'Sin puntuación'}
+                            </Text>
+
+                            <Text style={styles.selectedCafeRating}>
+                                BusCafé ⭐{' '}
+                                {selectedCafe.buscafeRating !== null
+                                    ? selectedCafe.buscafeRating.toFixed(1)
+                                    : 'Sin puntuación'}
+                            </Text>
+
+                            <View style={styles.selectedCafeArrow} />
+                        </TouchableOpacity>
+                    )}
+                    <View style={styles.listContainer}>
+                        <Text style={styles.listTitle}>
+                            {explorationCafes !== null
+                                ? 'Cafeterías de esta zona'
+                                : 'Cafeterías cercanas'}
+                        </Text>
+
+                        <FlatList
+                            ref={listRef}
+                            data={sortedCafes}
+                            onScrollToIndexFailed={(info) => {
+                                listRef.current?.scrollToOffset({
+                                    offset:
+                                        info.averageItemLength *
+                                        info.index,
+                                    animated: false,
+                                });
+
+                                setTimeout(() => {
+                                    listRef.current?.scrollToIndex({
+                                        index: info.index,
+                                        animated: true,
+                                        viewPosition: 0.5,
+                                    });
+                                }, 100);
+                            }}
+                            keyExtractor={(cafe) =>
+                                cafe.googlePlaceId
+                            }
+                            showsVerticalScrollIndicator
+                            renderItem={({ item: cafe }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.cafeRow,
+                                        selectedCafeId ===
+                                            cafe.googlePlaceId &&
+                                            styles.cafeRowSelected,
+                                    ]}
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        if (
+                                            selectedCafeId ===
+                                            cafe.googlePlaceId
+                                        )
+                                        {
+                                            navigation.navigate(
+                                                'CafeDetail',
+                                                {
+                                                    googlePlaceId:
+                                                        cafe.googlePlaceId,
+                                                }
+                                            );
+
+                                            return;
+                                        }
+
+                                        setSelectedCafeId(
+                                            cafe.googlePlaceId
+                                        );
+
+                                        programmaticMovementRef.current = true;
 
                                         mapRef.current?.animateToRegion(
                                             {
@@ -579,184 +667,44 @@ export default function MapScreen(
                                             },
                                             350
                                         );
-
-                                        requestAnimationFrame(() => {
-                                            const currentIndex =
-                                                sortedCafes.findIndex(
-                                                    (item) =>
-                                                        item.googlePlaceId ===
-                                                        cafeId
-                                                );
-
-                                            if (currentIndex < 0)
-                                            {
-                                                return;
-                                            }
-
-                                            listRef.current?.scrollToIndex({
-                                                index: currentIndex,
-                                                animated: true,
-                                                viewPosition: 0.5,
-                                            });
-                                        });
                                     }}
-                                />
-                            ))}
-                        </MapView>
-                        {selectedCafe && selectedCafePoint && (
-                            <TouchableOpacity
-                                style={[
-                                    styles.selectedCafeCard,
-                                    {
-                                        left: selectedCafePoint.x,
-                                        top: selectedCafePoint.y,
-                                    },
-                                ]}
-                                activeOpacity={0.85}
-                                onPress={() => {
-                                    navigation.navigate(
-                                        'CafeDetail',
-                                        {
-                                            googlePlaceId:
-                                                selectedCafe.googlePlaceId,
-                                        }
-                                    );
-                                }}
-                            >
-                                <Text style={styles.selectedCafeName}>
-                                    {selectedCafe.name}
-                                </Text>
-
-                                <Text
-                                    style={styles.selectedCafeAddress}
-                                    numberOfLines={1}
-                                    ellipsizeMode="tail"
                                 >
-                                    {selectedCafe.shortAddress}
-                                </Text>
-
-                                <Text style={styles.selectedCafeRating}>
-                                    Google ⭐{' '}
-                                    {selectedCafe.googleRating !== null
-                                        ? selectedCafe.googleRating.toFixed(1)
-                                        : 'Sin puntuación'}
-                                </Text>
-
-                                <Text style={styles.selectedCafeRating}>
-                                    BusCafé ⭐{' '}
-                                    {selectedCafe.buscafeRating !== null
-                                        ? selectedCafe.buscafeRating.toFixed(1)
-                                        : 'Sin puntuación'}
-                                </Text>
-
-                                <View style={styles.selectedCafeArrow} />
-                            </TouchableOpacity>
-                        )}
-                        <View style={styles.listContainer}>
-                            <Text style={styles.listTitle}>
-                                Cafeterías cercanas
-                            </Text>
-
-                            <FlatList
-                                ref={listRef}
-                                data={sortedCafes}
-                                onScrollToIndexFailed={(info) => {
-                                    listRef.current?.scrollToOffset({
-                                        offset:
-                                            info.averageItemLength *
-                                            info.index,
-                                        animated: false,
-                                    });
-
-                                    setTimeout(() => {
-                                        listRef.current?.scrollToIndex({
-                                            index: info.index,
-                                            animated: true,
-                                            viewPosition: 0.5,
-                                        });
-                                    }, 100);
-                                }}
-                                keyExtractor={(cafe) =>
-                                    cafe.googlePlaceId
-                                }
-                                showsVerticalScrollIndicator
-                                renderItem={({ item: cafe }) => (
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.cafeRow,
-                                            selectedCafeId ===
-                                                cafe.googlePlaceId &&
-                                                styles.cafeRowSelected,
-                                        ]}
-                                        activeOpacity={0.7}
-                                        onPress={() => {
-                                            if (
-                                                selectedCafeId ===
-                                                cafe.googlePlaceId
-                                            )
-                                            {
-                                                navigation.navigate(
-                                                    'CafeDetail',
-                                                    {
-                                                        googlePlaceId:
-                                                            cafe.googlePlaceId,
-                                                    }
-                                                );
-
-                                                return;
-                                            }
-
-                                            setSelectedCafeId(
-                                                cafe.googlePlaceId
-                                            );
-
-                                            mapRef.current?.animateToRegion(
-                                                {
-                                                    latitude: cafe.latitude,
-                                                    longitude: cafe.longitude,
-                                                    latitudeDelta: 0.01,
-                                                    longitudeDelta: 0.01,
-                                                },
-                                                350
-                                            );
-                                        }}
-                                    >
-                                        <View style={styles.cafeMainInfo}>
-                                            <Text
-                                                style={styles.cafeName}
-                                                numberOfLines={1}
-                                                ellipsizeMode="tail"
-                                            >
-                                                {cafe.name}
-                                                {cafe.shortAddress
-                                                    ? ` • ${cafe.shortAddress}`
-                                                    : ''}
-                                            </Text>
-
-                                            <Text style={styles.cafeRatings}>
-                                                Google ★{' '}
-                                                {cafe.googleRating !== null
-                                                    ? cafe.googleRating.toFixed(1)
-                                                    : 'Sin reseñas'}
-                                                {'   ·   '}
-                                                BusCafé ★{' '}
-                                                {cafe.buscafeRating !== null
-                                                    ? cafe.buscafeRating.toFixed(1)
-                                                    : 'Sin reseñas'}
-                                            </Text>
-                                        </View>
-
-                                        <Text style={styles.cafeDistance}>
-                                            {cafe.distanceKm !== null
-                                                ? `${cafe.distanceKm.toFixed(1)} km`
-                                                : '—'}
+                                    <View style={styles.cafeMainInfo}>
+                                        <Text
+                                            style={styles.cafeName}
+                                            numberOfLines={1}
+                                            ellipsizeMode="tail"
+                                        >
+                                            {cafe.name}
+                                            {cafe.shortAddress
+                                                ? ` • ${cafe.shortAddress}`
+                                                : ''}
                                         </Text>
-                                    </TouchableOpacity>
-                                )}
-                            />
-                        </View>
+
+                                        <Text style={styles.cafeRatings}>
+                                            Google ★{' '}
+                                            {cafe.googleRating !== null
+                                                ? cafe.googleRating.toFixed(1)
+                                                : 'Sin reseñas'}
+                                            {'   ·   '}
+                                            BusCafé ★{' '}
+                                            {cafe.buscafeRating !== null
+                                                ? cafe.buscafeRating.toFixed(1)
+                                                : 'Sin reseñas'}
+                                        </Text>
+                                    </View>
+
+                                    <Text style={styles.cafeDistance}>
+                                        {cafe.distanceKm !== null
+                                            ? `${cafe.distanceKm.toFixed(1)} km`
+                                            : '—'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        />
                     </View>
-                )}
+                </View>
+            )}
         </SafeAreaView>
     );
 }
@@ -944,5 +892,71 @@ const styles = StyleSheet.create({
 
     cafeRowSelected: {
         backgroundColor: '#F3E4C8',
+    },
+
+    mapControls: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        right: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        zIndex: 20,
+    },
+
+    searchAreaButton: {
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+        elevation: 4,
+    },
+
+    searchAreaButtonText: {
+        color: '#4A2416',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+
+    recenterButton: {
+        marginLeft: 'auto',
+        backgroundColor: '#FFFFFF',
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 4,
+    },
+
+    recenterButtonText: {
+        fontSize: 23,
+    },
+
+    explorationStatus: {
+        position: 'absolute',
+        top: 70,
+        alignSelf: 'center',
+        backgroundColor: '#FFFFFF',
+        padding: 12,
+        borderRadius: 12,
+        zIndex: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+
+    explorationError: {
+        position: 'absolute',
+        top: 70,
+        alignSelf: 'center',
+        backgroundColor: '#FFFFFF',
+        color: '#A13D32',
+        padding: 12,
+        borderRadius: 12,
+        zIndex: 15,
     },
 });

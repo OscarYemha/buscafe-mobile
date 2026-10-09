@@ -60,7 +60,9 @@ export default function AccountScreen()
                         <TouchableOpacity
                             style={styles.primaryButton}
                             onPress={() =>
-                                navigation.navigate('Login')
+                                navigation.navigate('Login', {
+                                    returnTo: 'Home',
+                                })
                             }
                         >
                             <Text style={styles.primaryButtonText}>

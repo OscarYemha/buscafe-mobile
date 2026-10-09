@@ -26,7 +26,7 @@ export default function VerifyEmailScreen({
     route,
 }: Props)
 {
-    const { email } = route.params;
+    const { email, returnTo } = route.params;
     const { verify } = useAuth();
 
     const [code, setCode] = useState('');
@@ -55,7 +55,22 @@ export default function VerifyEmailScreen({
                 code
             );
 
-            navigation.popToTop();
+            if (returnTo === 'previous' && navigation.canGoBack())
+            {
+                navigation.goBack();
+            }
+            else
+            {
+                navigation.reset({
+                    index: 0,
+                    routes: [{
+                        name: 'Main',
+                        params: {
+                            screen: returnTo === 'Home' ? 'Home' : 'Account',
+                        },
+                    }],
+                });
+            }
         }
         catch (error)
         {

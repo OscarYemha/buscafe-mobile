@@ -47,26 +47,11 @@ export default function DeleteAccountScreen()
         useState(false);
 
     const handleDelete = () => {
-        if (!password)
+        if (!password.trim())
         {
             Alert.alert(
-                'Cuenta eliminada',
-                'Tu cuenta fue eliminada correctamente.',
-                [
-                    {
-                        text: 'Aceptar',
-                        onPress: () => {
-                            navigation.reset({
-                                index: 0,
-                                routes: [
-                                    {
-                                        name: 'AccountHome',
-                                    },
-                                ],
-                            });
-                        },
-                    },
-                ]
+                'Contraseña requerida',
+                'Ingresá tu contraseña actual para eliminar tu cuenta.'
             );
 
             return;
@@ -100,7 +85,17 @@ export default function DeleteAccountScreen()
 
             Alert.alert(
                 'Cuenta eliminada',
-                'Tu cuenta fue eliminada correctamente.'
+                'Tu cuenta fue eliminada correctamente.',
+                [
+                    {
+                        text: 'Aceptar',
+                        onPress: () => {
+                            navigation.popToTop();
+
+                            navigation.getParent()?.navigate('Home');
+                        },
+                    },
+                ]
             );
         }
         catch (error)

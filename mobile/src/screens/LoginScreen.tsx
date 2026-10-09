@@ -19,7 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'Login'>;
 
-export default function LoginScreen( {navigation}: Props) {
+export default function LoginScreen( { navigation, route }: Props) {
+    const returnTo = route.params?.returnTo;
     const { login } = useAuth();
 
     const [email, setEmail] = useState('');
@@ -48,17 +49,26 @@ export default function LoginScreen( {navigation}: Props) {
                 password
             );
 
-            navigation.reset({
-                index: 0,
-                routes: [
-                    {
-                        name: 'Main',
-                        params: {
-                            screen: 'Home',
+            if (returnTo === 'previous' && navigation.canGoBack())
+            {
+                navigation.goBack();
+            }
+            else
+            {
+                navigation.reset({
+                    index: 0,
+                    routes: [
+                        {
+                            name: 'Main',
+                            params: {
+                                screen: returnTo === 'Account'
+                                    ? 'Account'
+                                    : 'Home',
+                            },
                         },
-                    },
-                ],
-            });
+                    ],
+                });
+            }
         }
         catch (error)
         {
@@ -68,6 +78,7 @@ export default function LoginScreen( {navigation}: Props) {
                     'VerifyEmail',
                     {
                         email: email.trim().toLowerCase(),
+                        returnTo,
                     }
                 );
 
@@ -206,7 +217,9 @@ export default function LoginScreen( {navigation}: Props) {
                             <TouchableOpacity
                                 style={styles.registerLink}
                                 onPress={() =>
-                                    navigation.replace('Register')
+                                    navigation.replace('Register', {
+                                        returnTo,
+                                    })
                                 }
                                 disabled={isLoading}
                             >

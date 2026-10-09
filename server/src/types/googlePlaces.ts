@@ -55,6 +55,17 @@ export type GooglePlace = {
     nationalPhoneNumber?: string;
 
     googleMapsUri?: string;
+
+    photos?: {
+        name: string;
+        widthPx?: number;
+        heightPx?: number;
+        authorAttributions?: {
+            displayName: string;
+            uri: string;
+            photoUri?: string;
+        }[];
+    }[];
 };
 
 export type GoogleTextSearchResponse = {

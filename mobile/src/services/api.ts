@@ -185,6 +185,16 @@ export type LoginResponse = {
     user: AuthUser;
 };
 
+export class InvalidSessionError extends Error
+{
+    constructor()
+    {
+        super('Tu sesión venció. Iniciá sesión nuevamente.');
+
+        this.name = 'InvalidSessionError';
+    }
+}
+
 export class EmailVerificationRequiredError extends Error
 {
     constructor()
@@ -239,19 +249,37 @@ export async function loginUser(
     password: string
 ): Promise<LoginResponse>
 {
-    const response = await fetch(
-        `${API_URL}/users/login`,
-        {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                email,
-                password
-            }),
-        }
-    );
+    let response: Response;
+
+    try
+    {
+        response = await fetch(
+            `${API_URL}/users/login`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email,
+                    password
+                }),
+            }
+        );
+    }
+    catch
+    {
+        throw new Error(
+            'No pudimos conectar con el servidor. Revisá tu conexión a Internet e intentá nuevamente.'
+        );
+    }
+
+    if (response.status >= 500)
+    {
+        throw new Error(
+            'El servidor no está disponible en este momento. Intentá nuevamente en unos minutos.'
+        );
+    }
 
     if (!response.ok)
     {
@@ -346,6 +374,11 @@ export async function getCurrentUser(
         }
     );
     
+    if (response.status === 401)
+    {
+        throw new InvalidSessionError();
+    }
+
     if (!response.ok)
     {
         throw new Error('No se pudo restaurar la sesión');

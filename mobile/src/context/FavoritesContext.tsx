@@ -3,6 +3,7 @@ import {
     ReactNode,
     useContext,
     useEffect,
+    useRef,
     useState,
 } from 'react';
 
@@ -47,7 +48,15 @@ export function FavoritesProvider({
     children: ReactNode;
 })
 {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+
+    const isAuthenticatedRef = useRef(isAuthenticated);
+    isAuthenticatedRef.current = isAuthenticated;
+
+    const userIdRef = useRef(user?.id);
+    userIdRef.current = user?.id;
+
+    const favoritesRequestIdRef = useRef(0);
 
     const [favorites, setFavorites] =
         useState<Favorite[]>([]);
@@ -58,9 +67,14 @@ export function FavoritesProvider({
     const refreshFavorites = async () => {
         if (!isAuthenticated)
         {
+            ++favoritesRequestIdRef.current;
             setFavorites([]);
+            setIsLoadingFavorites(false);
             return;
         }
+
+        const requestedUserId = user?.id;
+        const requestId = ++favoritesRequestIdRef.current;
 
         try
         {
@@ -69,7 +83,14 @@ export function FavoritesProvider({
             const result =
                 await getFavorites();
 
-            setFavorites(result);
+            if (
+                isAuthenticatedRef.current &&
+                userIdRef.current === requestedUserId &&
+                favoritesRequestIdRef.current === requestId
+            )
+            {
+                setFavorites(result);
+            }
         }
         catch (error)
         {
@@ -80,13 +101,21 @@ export function FavoritesProvider({
         }
         finally
         {
-            setIsLoadingFavorites(false);
+            if (favoritesRequestIdRef.current === requestId)
+            {
+                setIsLoadingFavorites(false);
+            }
         }
     };
 
     useEffect(() => {
+        ++favoritesRequestIdRef.current;
+
+        setFavorites([]);
+        setIsLoadingFavorites(false);
+
         refreshFavorites();
-    }, [isAuthenticated]);
+    }, [isAuthenticated, user?.id]);
 
     const isFavorite = (
         googlePlaceId: string

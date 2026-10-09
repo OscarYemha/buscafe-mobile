@@ -569,6 +569,7 @@ export async function getPlaceDetails(
                     'websiteUri',
                     'nationalPhoneNumber',
                     'googleMapsUri',
+                    'photos',
                 ].join(','),
             },
         }
@@ -588,4 +589,44 @@ export async function getPlaceDetails(
         await response.json();
 
     return place;
+}
+
+export async function getPlacePhoto(
+    photoName: string
+): Promise<string> {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+
+    if (!apiKey) {
+        throw new Error(
+            'GOOGLE_PLACES_API_KEY no está definida'
+        );
+    }
+
+    const response = await fetch(
+        `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=1000&skipHttpRedirect=true`,
+        {
+            headers: {
+                'X-Goog-Api-Key': apiKey,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            `Error al obtener fotografía: ${response.status}`
+        );
+    }
+
+    const data = await response.json() as {
+        name?: string;
+        photoUri?: string;
+    };
+
+    if (!data.photoUri) {
+        throw new Error(
+            'Google Places no devolvió la URL de la fotografía'
+        );
+    }
+
+    return data.photoUri;
 }

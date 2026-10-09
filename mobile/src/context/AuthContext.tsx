@@ -11,6 +11,7 @@ import {
     changePassword,
     deleteAccount,
     getCurrentUser,
+    InvalidSessionError,
     loginUser,
     registerUser,
     RegisterResponse,
@@ -80,6 +81,22 @@ const AuthContext =
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
+async function clearStoredSession(): Promise<void>
+{
+    try
+    {
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync(USER_KEY);
+    }
+    catch (error)
+    {
+        console.error(
+            'ERROR LIMPIANDO CREDENCIALES:',
+            error
+        );
+    }
+}
+
 export function AuthProvider({children, }: {children: ReactNode})
 {
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -104,10 +121,20 @@ export function AuthProvider({children, }: {children: ReactNode})
 
                 setUser(currentUser);
 
-                await SecureStore.setItemAsync(
-                    USER_KEY,
-                    JSON.stringify(currentUser)
-                );
+                try
+                {
+                    await SecureStore.setItemAsync(
+                        USER_KEY,
+                        JSON.stringify(currentUser)
+                    );
+                }
+                catch (storageError)
+                {
+                    console.error(
+                        'ERROR GUARDANDO USUARIO RESTAURADO:',
+                        storageError
+                    );
+                }
             }
             catch (error)
             {
@@ -116,11 +143,82 @@ export function AuthProvider({children, }: {children: ReactNode})
                     error
                 );
 
-                await SecureStore.deleteItemAsync(TOKEN_KEY);
+                if (error instanceof InvalidSessionError)
+                {
+                    await clearStoredSession();
 
-                await SecureStore.deleteItemAsync(USER_KEY);
+                    setUser(null);
+                }
+                else
+                {
+                    let savedUser: string | null = null;
+                    let storageReadFailed = false;
 
-                setUser(null);
+                    try
+                    {
+                        savedUser =
+                            await SecureStore.getItemAsync(USER_KEY);
+                    }
+                    catch (storageError)
+                    {
+                        storageReadFailed = true;
+
+                        console.error(
+                            'ERROR LEYENDO USUARIO GUARDADO:',
+                            storageError
+                        );
+                    }
+
+                    if (storageReadFailed)
+                    {
+                        setUser(null);
+                    }
+                    else if (savedUser)
+                    {
+                        try
+                        {
+                            const parsedUser: unknown =
+                                JSON.parse(savedUser);
+
+                            if (
+                                typeof parsedUser === 'object' &&
+                                parsedUser !== null &&
+                                'id' in parsedUser &&
+                                typeof parsedUser.id === 'number' &&
+                                'name' in parsedUser &&
+                                typeof parsedUser.name === 'string' &&
+                                'email' in parsedUser &&
+                                typeof parsedUser.email === 'string' &&
+                                'avatarUrl' in parsedUser &&
+                                (
+                                    parsedUser.avatarUrl === null ||
+                                    typeof parsedUser.avatarUrl === 'string'
+                                )
+                            )
+                            {
+                                setUser(parsedUser as AuthUser);
+                            }
+                            else
+                            {
+                                await clearStoredSession();
+
+                                setUser(null);
+                            }
+                        }
+                        catch
+                        {
+                            await clearStoredSession();
+
+                            setUser(null);
+                        }
+                    }
+                    else
+                    {
+                        await clearStoredSession();
+
+                        setUser(null);
+                    }
+                }
             }
             finally
             {
@@ -328,15 +426,28 @@ export function AuthProvider({children, }: {children: ReactNode})
             password
         );
 
-        await SecureStore.deleteItemAsync(
-            TOKEN_KEY
-        );
+        try
+        {
+            const results = await Promise.allSettled([
+                SecureStore.deleteItemAsync(TOKEN_KEY),
+                SecureStore.deleteItemAsync(USER_KEY),
+            ]);
 
-        await SecureStore.deleteItemAsync(
-            USER_KEY
-        );
+            const failed = results.some(
+                result => result.status === 'rejected'
+            );
 
-        setUser(null);
+            if (failed)
+            {
+                console.error(
+                    'La cuenta fue eliminada, pero no se pudieron borrar todas las credenciales locales.'
+                );
+            }
+        }
+        finally
+        {
+            setUser(null);
+        }
     };
 
     const updateUser = async (

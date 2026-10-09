@@ -3,6 +3,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import prisma from '../lib/prisma.js';
 import {
     getPlaceDetails,
+    getPlacePhoto,
     searchCafes,
     searchCafesNearby,
 } from '../services/googlePlaces.js';
@@ -284,6 +285,47 @@ router.get('/search', async (req, res) => {
     }
 });
 
+router.get('/place/:googlePlaceId/photo/:index', async (req, res) => {
+    try {
+        const { googlePlaceId, index } = req.params;
+
+        if (
+            typeof googlePlaceId !== 'string' ||
+            !googlePlaceId.trim() ||
+            typeof index !== 'string' ||
+            !/^[0-4]$/.test(index)
+        ) {
+            return res.status(400).json({
+                error: 'Parámetros de fotografía inválidos',
+            });
+        }
+
+        const googlePlace = await getPlaceDetails(googlePlaceId);
+        const photos = (googlePlace.photos ?? []).slice(0, 5);
+        const photo = photos[Number(index)];
+
+        if (!photo) {
+            return res.status(404).json({
+                error: 'Fotografía no disponible',
+            });
+        }
+
+        const photoUrl = await getPlacePhoto(photo.name);
+
+        return res.json({
+            url: photoUrl,
+            authorAttributions: photo.authorAttributions ?? [],
+        });
+    }
+    catch (error) {
+        console.error('ERROR OBTENIENDO FOTOGRAFÍA:', error);
+
+        return res.status(502).json({
+            error: 'No se pudo obtener la fotografía',
+        });
+    }
+});
+
 router.get('/place/:googlePlaceId', async (req, res) => {
     try
     {
@@ -308,6 +350,33 @@ router.get('/place/:googlePlaceId', async (req, res) => {
         }
 
         const stats = await getCafeStats(googlePlaceId);
+
+        const photoReferences = (googlePlace.photos ?? []).slice(0, 5);
+
+        const photos = await Promise.all(
+            photoReferences.map(async (photo) => {
+                try {
+                    const url = await getPlacePhoto(photo.name);
+
+                    return {
+                        name: photo.name,
+                        url,
+                        widthPx: photo.widthPx ?? null,
+                        heightPx: photo.heightPx ?? null,
+                        authorAttributions:
+                            photo.authorAttributions ?? [],
+                    };
+                }
+                catch (error) {
+                    console.error(
+                        'ERROR OBTENIENDO URL DE FOTOGRAFÍA:',
+                        error
+                    );
+
+                    return null;
+                }
+            })
+        );
 
         return res.json({
             ...cafe,
@@ -370,6 +439,10 @@ router.get('/place/:googlePlaceId', async (req, res) => {
 
             googleMapsUrl:
                 googlePlace.googleMapsUri ?? null,
+
+            photos: photos.filter(
+                (photo) => photo !== null
+            ),
         });
     }
     catch (error)

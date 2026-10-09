@@ -330,7 +330,9 @@ export default function AddReviewScreen({ route, navigation }: Props) {
 
         if (!isAuthenticated || !user)
         {
-            navigation.navigate('Login');
+            navigation.navigate('Login', {
+                returnTo: 'previous',
+            });
             return;
         }
 

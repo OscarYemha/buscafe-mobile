@@ -22,6 +22,7 @@ import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import DeleteAccountScreen from '../screens/DeleteAccountScreen';
+import { NearbyCafesProvider } from '../context/NearbyCafesContext';
 
 export type RootStackParamlist = {
     Main: NavigatorScreenParams<MainTabParamList>;
@@ -41,10 +42,15 @@ export type RootStackParamlist = {
         cafeLatitude: number;
         cafeLongitude: number;
     };
-    Login: undefined;
-    Register: undefined;
+    Login: {
+        returnTo?: 'previous' | 'Home' | 'Account';
+    } | undefined;
+    Register: {
+        returnTo?: 'previous' | 'Home' | 'Account';
+    } | undefined;
     VerifyEmail: {
         email: string;
+        returnTo?: 'previous' | 'Home' | 'Account';
     }
     ForgotPassword: {
         email?: string;
@@ -159,96 +165,97 @@ function MainTabs({ navigation }: MainTabsProps)
                     navigation.navigate('Search');
                 }}
             />
+            <NearbyCafesProvider>
+                <Tab.Navigator
+                    screenOptions={({ route }) => ({
+                        headerShown: false,
 
-            <Tab.Navigator
-                screenOptions={({ route }) => ({
-                    headerShown: false,
+                        tabBarActiveTintColor: '#6B3A22',
+                        tabBarInactiveTintColor: '#9A8578',
 
-                    tabBarActiveTintColor: '#6B3A22',
-                    tabBarInactiveTintColor: '#9A8578',
+                        tabBarStyle: {
+                            backgroundColor: '#FFFDFC',
+                            borderTopColor: '#E8D9C7',
+                            borderTopWidth: 1,
+                            elevation: 8,
+                        },
 
-                    tabBarStyle: {
-                        backgroundColor: '#FFFDFC',
-                        borderTopColor: '#E8D9C7',
-                        borderTopWidth: 1,
-                        elevation: 8,
-                    },
+                        tabBarLabelStyle: {
+                            fontSize: 12,
+                            fontWeight: '600',
+                        },
 
-                    tabBarLabelStyle: {
-                        fontSize: 12,
-                        fontWeight: '600',
-                    },
+                        tabBarIcon: ({
+                            focused,
+                            color,
+                            size,
+                        }) => {
+                            let iconName:
+                                | 'home'
+                                | 'home-outline'
+                                | 'map'
+                                | 'map-outline'
+                                | 'person'
+                                | 'person-outline';
 
-                    tabBarIcon: ({
-                        focused,
-                        color,
-                        size,
-                    }) => {
-                        let iconName:
-                            | 'home'
-                            | 'home-outline'
-                            | 'map'
-                            | 'map-outline'
-                            | 'person'
-                            | 'person-outline';
+                            if (route.name === 'Home')
+                            {
+                                iconName =
+                                    focused
+                                        ? 'home'
+                                        : 'home-outline';
+                            }
+                            else if (route.name === 'Map')
+                            {
+                                iconName =
+                                    focused
+                                        ? 'map'
+                                        : 'map-outline';
+                            }
+                            else
+                            {
+                                iconName =
+                                    focused
+                                        ? 'person'
+                                        : 'person-outline';
+                            }
 
-                        if (route.name === 'Home')
-                        {
-                            iconName =
-                                focused
-                                    ? 'home'
-                                    : 'home-outline';
-                        }
-                        else if (route.name === 'Map')
-                        {
-                            iconName =
-                                focused
-                                    ? 'map'
-                                    : 'map-outline';
-                        }
-                        else
-                        {
-                            iconName =
-                                focused
-                                    ? 'person'
-                                    : 'person-outline';
-                        }
+                            return (
+                                <Ionicons
+                                    name={iconName}
+                                    size={size}
+                                    color={color}
+                                />
+                            );
+                        },
+                    })}
+                >
+                    <Tab.Screen
+                        name="Home"
+                        component={HomeScreen}
+                        options={{
+                            title: 'Inicio',
+                        }}
+                    />
 
-                        return (
-                            <Ionicons
-                                name={iconName}
-                                size={size}
-                                color={color}
-                            />
-                        );
-                    },
-                })}
-            >
-                <Tab.Screen
-                    name="Home"
-                    component={HomeScreen}
-                    options={{
-                        title: 'Inicio',
-                    }}
-                />
+                    <Tab.Screen
+                        name="Map"
+                        component={MapScreen}
+                        options={{
+                            title: 'Mapa',
+                        }}
+                    />
 
-                <Tab.Screen
-                    name="Map"
-                    component={MapScreen}
-                    options={{
-                        title: 'Mapa',
-                    }}
-                />
-
-                <Tab.Screen
-                    name="Account"
-                    component={AccountNavigator}
-                    options={{
-                        title: 'Mi cuenta',
-                        popToTopOnBlur: true,
-                    }}
-                />
-            </Tab.Navigator>
+                    <Tab.Screen
+                        name="Account"
+                        component={AccountNavigator}
+                        options={{
+                            title: 'Mi cuenta',
+                            popToTopOnBlur: true,
+                        }}
+                    />
+                </Tab.Navigator>
+            </NearbyCafesProvider>
         </View>
     );
 }

@@ -29,8 +29,10 @@ const isValidEmail = (email: string): boolean => {
 
 export default function RegisterScreen({
     navigation,
+    route,
 }: Props)
 {
+    const returnTo = route.params?.returnTo;
     const { register } = useAuth();
 
     const [name, setName] = useState('');
@@ -87,6 +89,7 @@ export default function RegisterScreen({
                 'VerifyEmail',
                 {
                     email: email.trim().toLowerCase(),
+                    returnTo,
                 }
             );
         }
@@ -211,7 +214,9 @@ export default function RegisterScreen({
                         <TouchableOpacity
                             style={styles.loginLink}
                             onPress={() =>
-                                navigation.replace('Login')
+                                navigation.replace('Login', {
+                                    returnTo,
+                                })
                             }
                             disabled={isLoading}
                         >
