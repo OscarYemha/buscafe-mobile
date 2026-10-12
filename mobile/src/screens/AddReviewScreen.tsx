@@ -17,6 +17,7 @@ import { useReviewDraft } from '../context/ReviewDraftContext';
 import { useAuth } from '../context/AuthContext';
 import { createReview } from '../services/api';
 import { useReviews } from '../context/ReviewsContext';
+import { getErrorMessage } from '../utils/errorMessages';
 import { useState } from 'react';
 
 type Props = NativeStackScreenProps<
@@ -34,7 +35,14 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         cafeLongitude,
     } = route.params;
 
-    const {draft, setDraft, clearDraft} = useReviewDraft();
+    const {
+        draft,
+        setDraft,
+        clearDraft,
+        isDraftReady,
+        preparePublication,
+    } = useReviewDraft();
+
     const {user, isAuthenticated} = useAuth();
     const { notifyReviewsChanged } = useReviews();
 
@@ -83,7 +91,9 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         : null;
 
     const canSubmit =
-        rating > 0 && comment.trim().length > 0;
+        isDraftReady &&
+        rating > 0 &&
+        comment.trim().length > 0;
 
     const updateSpecificRating = (
         field:
@@ -322,8 +332,9 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         );
     };
 
-    const handleSubmit = async () => {
-        if (!canSubmit)
+        const handleSubmit = () =>
+    {
+        if (!canSubmit || isSubmitting)
         {
             return;
         }
@@ -333,81 +344,102 @@ export default function AddReviewScreen({ route, navigation }: Props) {
             navigation.navigate('Login', {
                 returnTo: 'previous',
             });
+
             return;
         }
 
-        try
-        {
-            setIsSubmitting(true);
-
-            await createReview({
-                googlePlaceId,
-                cafeName,
-                cafeAddress,
-                cafeLatitude,
-                cafeLongitude,
-
-                rating,
-                comment: comment.trim(),
-
-                coffeeRating:
-                    coffeeRating ?? undefined,
-
-                foodRating:
-                    foodRating ?? undefined,
-
-                serviceRating:
-                    serviceRating ?? undefined,
-
-                comfortRating:
-                    comfortRating ?? undefined,
-
-                quietRating:
-                    quietRating ?? undefined,
-
-                goodForWork:
-                    goodForWork ?? undefined,
-
-                goodForStudy:
-                    goodForStudy ?? undefined,
-
-                goodForDate:
-                    goodForDate ?? undefined,
-            });
-
-            clearDraft();
-            notifyReviewsChanged();
-            Alert.alert(
-                'Reseña publicada',
-                'Tu reseña se publicó correctamente.',
-                [
+        Alert.alert(
+            '¿Publicar reseña?',
+            `¿Querés publicar tu reseña de ${cafeName}?`,
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Publicar',
+                    onPress: async () =>
                     {
-                        text: 'Aceptar',
-                        onPress: () => {
-                            navigation.goBack();
-                        },
-                    },
-                ]
-            );
-        }
-        catch (error)
-        {
-            console.error(
-                'Error al publicar la reseña:',
-                error
-            );
+                        if (isSubmitting)
+                        {
+                            return;
+                        }
 
-            Alert.alert(
-                'No se pudo publicar la reseña',
-                error instanceof Error
-                    ? error.message
-                    : 'Ocurrió un error inesperado'
-            );
-        }
-        finally
-        {
-            setIsSubmitting(false);
-        }
+                        setIsSubmitting(true);
+
+                        try
+                        {
+                            const reviewData = {
+                                googlePlaceId,
+                                cafeName,
+                                cafeAddress,
+                                cafeLatitude,
+                                cafeLongitude,
+
+                                rating,
+                                comment: comment.trim(),
+
+                                coffeeRating: coffeeRating ?? undefined,
+                                foodRating: foodRating ?? undefined,
+                                serviceRating: serviceRating ?? undefined,
+                                comfortRating: comfortRating ?? undefined,
+                                quietRating: quietRating ?? undefined,
+
+                                goodForWork: goodForWork ?? undefined,
+                                goodForStudy: goodForStudy ?? undefined,
+                                goodForDate: goodForDate ?? undefined,
+                            };
+
+                            const idempotencyKey = await preparePublication(
+                                user.id,
+                                JSON.stringify(reviewData)
+                            );
+
+                            await createReview({
+                                ...reviewData,
+                                idempotencyKey,
+                            });
+
+                            await clearDraft();
+                            notifyReviewsChanged();
+
+                            Alert.alert(
+                                'Reseña publicada',
+                                'Tu reseña se publicó correctamente.',
+                                [
+                                    {
+                                        text: 'Aceptar',
+                                        onPress: () =>
+                                        {
+                                            navigation.goBack();
+                                        },
+                                    },
+                                ]
+                            );
+                        }
+                        catch (error)
+                        {
+                            console.error(
+                                'Error al publicar la reseña:',
+                                error
+                            );
+
+                            Alert.alert(
+                                'No se pudo publicar la reseña',
+                                getErrorMessage(
+                                    error,
+                                    'No pudimos publicar tu reseña. Intentá nuevamente.'
+                                )
+                            );
+                        }
+                        finally
+                        {
+                            setIsSubmitting(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     return (

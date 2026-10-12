@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import {
     useCallback,
+    useEffect,
     useRef,
     useState,
 } from 'react';
@@ -41,6 +42,21 @@ export default function CafeDetailScreen({ route, navigation }: Props)
     const [error, setError] = useState<string | null>(null);
     const [modalSize, setModalSize] = useState({ width: 0, height: 0 });
     const [loadedPhotoSizes, setLoadedPhotoSizes] = useState<Record<string, { width: number; height: number }>>({});
+
+    useEffect(() =>
+    {
+        navigation.setOptions({
+            headerTitle: () => (
+                <Text
+                    style={styles.navigationTitle}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                >
+                    {cafe?.name ?? 'Cafetería'}
+                </Text>
+            ),
+        });
+    }, [navigation, cafe?.name]);
 
     const photoTouchStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -1075,5 +1091,12 @@ const styles = StyleSheet.create({
     photoModalImageContent: {
         width: '100%',
         height: '100%',
+    },
+
+    navigationTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#4A2416',
+        maxWidth: 240,
     },
 });

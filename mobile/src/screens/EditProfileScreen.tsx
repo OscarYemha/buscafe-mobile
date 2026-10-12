@@ -1,4 +1,5 @@
 import {
+    ActivityIndicator,
     Alert,
     Image,
     ScrollView,
@@ -15,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AccountStackParamList } from '../navigation/AppNavigator';
+import { getErrorMessage } from '../utils/errorMessages';
 
 type EditProfileNavigation =
     NativeStackNavigationProp<
@@ -31,39 +33,19 @@ export default function EditProfileScreen()
         user,
         requestProfileEmailChange,
         verifyProfileEmailChange,
-        updateAvatar,
-        updateProfileName,
+        updateProfileDetails,
     } = useAuth();
 
-    const [name, setName] =
-        useState(user?.name ?? '');
-
-    const [email, setEmail] =
-        useState(user?.email ?? '');
-
-    const [selectedImageUri, setSelectedImageUri] =
-        useState<string | null>(null);
-
-    const [isSaving, setIsSaving] =
-        useState(false);
-
-    const [saveSuccess, setSaveSuccess] =
-        useState(false);
-
-    const [isRequestingEmailChange, setIsRequestingEmailChange] =
-        useState(false);
-
-    const [emailChangeRequested, setEmailChangeRequested] =
-        useState(false);
-
-    const [emailCodeSent, setEmailCodeSent] =
-        useState(false);
-
-    const [emailChangeSuccess, setEmailChangeSuccess] =
-        useState(false);
-
-    const [verificationCode, setVerificationCode] =
-        useState('');
+    const [name, setName] = useState(user?.name ?? '');
+    const [email, setEmail] = useState(user?.email ?? '');
+    const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [isRequestingEmailChange, setIsRequestingEmailChange] = useState(false);
+    const [emailChangeRequested, setEmailChangeRequested] = useState(false);
+    const [emailCodeSent, setEmailCodeSent] = useState(false);
+    const [emailChangeSuccess, setEmailChangeSuccess] = useState(false);
+    const [verificationCode, setVerificationCode] = useState('');
 
     if (!user)
     {
@@ -147,9 +129,10 @@ export default function EditProfileScreen()
 
             Alert.alert(
                 'No se pudo solicitar el cambio de email',
-                error instanceof Error
-                    ? error.message
-                    : 'Ocurrió un error inesperado. Intentá nuevamente.'
+                getErrorMessage(
+                    error,
+                    'Ocurrió un error inesperado. Intentá nuevamente.'
+                )
             );
         }
         finally
@@ -195,9 +178,10 @@ export default function EditProfileScreen()
 
             Alert.alert(
                 'No se pudo verificar el nuevo email',
-                error instanceof Error
-                    ? error.message
-                    : 'Ocurrió un error inesperado. Intentá nuevamente.'
+                getErrorMessage(
+                    error,
+                    'Ocurrió un error inesperado. Intentá nuevamente.'
+                )
             );
         }
         finally
@@ -206,15 +190,35 @@ export default function EditProfileScreen()
         }
     };
 
-    const handleSave = async () =>
+    const handleSave = () =>
     {
-        if (!user)
+        if (!user || isSaving || saveSuccess)
         {
             return;
         }
 
         const normalizedName =
             name.trim();
+
+        if (!normalizedName)
+        {
+            Alert.alert(
+                'Nombre obligatorio',
+                'Ingresá tu nombre para continuar.'
+            );
+
+            return;
+        }
+
+        if (normalizedName.length > 100)
+        {
+            Alert.alert(
+                'Nombre demasiado largo',
+                'El nombre no puede superar los 100 caracteres.'
+            );
+
+            return;
+        }
 
         const nameChanged =
             normalizedName !== user.name;
@@ -224,54 +228,66 @@ export default function EditProfileScreen()
 
         if (!nameChanged && !avatarChanged)
         {
+            Alert.alert(
+                'Sin cambios',
+                'No hay cambios para guardar.'
+            );
+
             return;
         }
 
-        try
-        {
-            setIsSaving(true);
+        Alert.alert(
+            '¿Guardar cambios?',
+            'Se actualizarán los datos de tu perfil.',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Guardar',
+                    onPress: async () =>
+                    {
+                        setIsSaving(true);
 
-            if (nameChanged)
-            {
-                await updateProfileName(
-                    normalizedName
-                );
-            }
+                        try
+                        {
+                            await updateProfileDetails(
+                                normalizedName,
+                                selectedImageUri ?? undefined
+                            );
 
-            if (avatarChanged)
-            {
-                await updateAvatar(
-                    selectedImageUri
-                );
+                            setSelectedImageUri(null);
+                            setSaveSuccess(true);
 
-                setSelectedImageUri(null);
-            }
+                            setTimeout(() =>
+                            {
+                                navigation.popToTop();
+                            }, 2000);
+                        }
+                        catch (error)
+                        {
+                            console.error(
+                                'ERROR ACTUALIZANDO PERFIL:',
+                                error
+                            );
 
-            setSaveSuccess(true);
-
-            setTimeout(() => {
-                setSaveSuccess(false);
-                navigation.popToTop();
-            }, 2000);
-        }
-        catch (error)
-        {
-            console.error(
-                'ERROR ACTUALIZANDO PERFIL:',
-                error
-            );
-
-            Alert.alert(
-                'No se pudieron guardar todos los cambios',
-                error instanceof Error
-                    ? error.message
-                    : 'Ocurrió un error inesperado. Intentá nuevamente.'
-            );
-        }
-        finally
-        {
-            setIsSaving(false);
-        }
+                            Alert.alert(
+                                'No se pudo guardar el perfil',
+                                getErrorMessage(
+                                    error,
+                                    'No se pudo actualizar el perfil. Intentá nuevamente.'
+                                )
+                            );
+                        }
+                        finally
+                        {
+                            setIsSaving(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     return (
@@ -305,6 +321,7 @@ export default function EditProfileScreen()
 
                         <TouchableOpacity
                             style={styles.changePhotoButton}
+                            disabled={isSaving || saveSuccess}
                             onPress={pickImage}
                             activeOpacity={0.7}
                         >
@@ -324,6 +341,7 @@ export default function EditProfileScreen()
                         <TextInput
                             style={styles.input}
                             value={name}
+                            editable={!isSaving && !saveSuccess}
                             onChangeText={setName}
                             autoCapitalize="words"
                         />
@@ -337,6 +355,7 @@ export default function EditProfileScreen()
                         <TextInput
                             style={styles.input}
                             value={email}
+                            editable={!isSaving && !saveSuccess}
                             onChangeText={setEmail}
                             autoCapitalize="none"
                             keyboardType="email-address"
@@ -415,13 +434,21 @@ export default function EditProfileScreen()
                         <TouchableOpacity
                             style={styles.saveButton}
                             onPress={handleSave}
-                            disabled={isSaving}
+                            disabled={isSaving || saveSuccess || isRequestingEmailChange}
+                            activeOpacity={0.7}
                         >
-                            <Text style={styles.saveButtonText}>
-                                {isSaving
-                                    ? 'Guardando...'
-                                    : 'Guardar cambios'}
-                            </Text>
+                            {isSaving ? (
+                                <ActivityIndicator
+                                    size="small"
+                                    color="#FFFFFF"
+                                />
+                            ) : (
+                                <Text style={styles.saveButtonText}>
+                                    {saveSuccess
+                                        ? 'Cambios guardados'
+                                        : 'Guardar cambios'}
+                                </Text>
+                            )}
                         </TouchableOpacity>
                     )}
                     {saveSuccess && (

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import prisma from "../lib/prisma";
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth";
+import { Prisma } from '../generated/prisma/client';
 
 const router = Router();
 
@@ -20,7 +21,8 @@ function isOptionalBoolean(value: unknown): boolean
         typeof value === 'boolean';
 }
 
-router.post('/', requireAuth, async (req:AuthenticatedRequest, res) => {
+router.post('/', requireAuth, async (req: AuthenticatedRequest, res) =>
+{
     try
     {
         const {
@@ -29,7 +31,6 @@ router.post('/', requireAuth, async (req:AuthenticatedRequest, res) => {
             cafeAddress,
             cafeLatitude,
             cafeLongitude,
-
             rating,
             comment,
             coffeeRating,
@@ -40,7 +41,11 @@ router.post('/', requireAuth, async (req:AuthenticatedRequest, res) => {
             goodForWork,
             goodForStudy,
             goodForDate,
+            idempotencyKey,
         } = req.body;
+
+        const uuidRegex =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
         if (
             typeof googlePlaceId !== 'string' ||
@@ -65,7 +70,14 @@ router.post('/', requireAuth, async (req:AuthenticatedRequest, res) => {
             !isOptionalRating(quietRating) ||
             !isOptionalBoolean(goodForWork) ||
             !isOptionalBoolean(goodForStudy) ||
-            !isOptionalBoolean(goodForDate)
+            !isOptionalBoolean(goodForDate) ||
+            (
+                idempotencyKey !== undefined &&
+                (
+                    typeof idempotencyKey !== 'string' ||
+                    !uuidRegex.test(idempotencyKey)
+                )
+            )
         )
         {
             return res.status(400).json({
@@ -74,7 +86,7 @@ router.post('/', requireAuth, async (req:AuthenticatedRequest, res) => {
         }
 
         const userId = req.userId;
-        
+
         if (!userId)
         {
             return res.status(401).json({
@@ -82,66 +94,141 @@ router.post('/', requireAuth, async (req:AuthenticatedRequest, res) => {
             });
         }
 
+        const normalizedPlaceId = googlePlaceId.trim();
+        const normalizedComment = comment.trim();
+
+        const matchesRequest = (
+            existing: {
+                userId: number | null;
+                cafe: { googlePlaceId: string };
+                rating: number;
+                comment: string;
+                coffeeRating: number | null;
+                foodRating: number | null;
+                serviceRating: number | null;
+                comfortRating: number | null;
+                quietRating: number | null;
+                goodForWork: boolean | null;
+                goodForStudy: boolean | null;
+                goodForDate: boolean | null;
+            }
+        ): boolean =>
+        {
+            return (
+                existing.userId === userId &&
+                existing.cafe.googlePlaceId === normalizedPlaceId &&
+                existing.rating === rating &&
+                existing.comment === normalizedComment &&
+                existing.coffeeRating === (coffeeRating ?? null) &&
+                existing.foodRating === (foodRating ?? null) &&
+                existing.serviceRating === (serviceRating ?? null) &&
+                existing.comfortRating === (comfortRating ?? null) &&
+                existing.quietRating === (quietRating ?? null) &&
+                existing.goodForWork === (goodForWork ?? null) &&
+                existing.goodForStudy === (goodForStudy ?? null) &&
+                existing.goodForDate === (goodForDate ?? null)
+            );
+        };
+
+        const findExisting = async () =>
+        {
+            return prisma.review.findUnique({
+                where: {
+                    idempotencyKey,
+                },
+                include: {
+                    cafe: {
+                        select: {
+                            googlePlaceId: true,
+                        },
+                    },
+                },
+            });
+        };
+
+        const existing = await findExisting();
+
+        if (existing)
+        {
+            if (!matchesRequest(existing))
+            {
+                return res.status(409).json({
+                    error: 'Esta solicitud ya se utilizó para otra reseña.',
+                });
+            }
+
+            return res.status(200).json(existing);
+        }
+
         const cafe = await prisma.cafe.upsert({
             where: {
-                googlePlaceId:
-                    googlePlaceId.trim(),
+                googlePlaceId: normalizedPlaceId,
             },
-
             update: {
-                name:
-                    cafeName.trim(),
-
-                address:
-                    cafeAddress.trim(),
-
-                latitude:
-                    cafeLatitude,
-
-                longitude:
-                    cafeLongitude,
+                name: cafeName.trim(),
+                address: cafeAddress.trim(),
+                latitude: cafeLatitude,
+                longitude: cafeLongitude,
             },
-
             create: {
-                googlePlaceId:
-                    googlePlaceId.trim(),
-
-                name:
-                    cafeName.trim(),
-
-                address:
-                    cafeAddress.trim(),
-
-                latitude:
-                    cafeLatitude,
-
-                longitude:
-                    cafeLongitude,
+                googlePlaceId: normalizedPlaceId,
+                name: cafeName.trim(),
+                address: cafeAddress.trim(),
+                latitude: cafeLatitude,
+                longitude: cafeLongitude,
             },
         });
 
-        const review = await prisma.review.create({
-            data: {
-                userId,
-                cafeId: cafe.id,
-                rating,
-                comment: comment.trim(),
-                coffeeRating,
-                foodRating,
-                serviceRating,
-                comfortRating,
-                quietRating,
-                goodForWork,
-                goodForStudy,
-                goodForDate,
-            },
-        });
+        try
+        {
+            const review = await prisma.review.create({
+                data: {
+                    userId,
+                    cafeId: cafe.id,
+                    rating,
+                    comment: normalizedComment,
+                    coffeeRating,
+                    foodRating,
+                    serviceRating,
+                    comfortRating,
+                    quietRating,
+                    goodForWork,
+                    goodForStudy,
+                    goodForDate,
+                    idempotencyKey,
+                },
+            });
 
-        return res.status(201).json(review);
+            return res.status(201).json(review);
+        }
+        catch (error)
+        {
+            if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2002'
+            )
+            {
+                const savedReview = await findExisting();
+
+                if (savedReview)
+                {
+                    if (!matchesRequest(savedReview))
+                    {
+                        return res.status(409).json({
+                            error: 'Esta solicitud ya se utilizó para otra reseña.',
+                        });
+                    }
+
+                    return res.status(200).json(savedReview);
+                }
+            }
+
+            throw error;
+        }
     }
-    catch(error)
+    catch (error)
     {
-        console.error(error);
+        console.error('Error al crear la reseña:', error);
 
         return res.status(500).json({
             error: 'No se pudo crear la reseña',

@@ -15,6 +15,7 @@ import {
 import { randomInt } from 'node:crypto';
 import multer from 'multer';
 import { supabase } from '../lib/supabase.js';
+import { randomUUID } from 'node:crypto';
 
 const router = Router();
 
@@ -652,6 +653,161 @@ router.post(
             return res.status(500).json({
                 error:
                     'No se pudo confirmar el cambio de email',
+            });
+        }
+    }
+);
+
+router.patch(
+    '/me/profile',
+    requireAuth,
+    avatarUpload.single('avatar'),
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        const userId = req.userId;
+        const file = req.file;
+        let newAvatarPath: string | null = null;
+
+        try
+        {
+            if (!userId)
+            {
+                return res.status(401).json({
+                    error: 'Autenticación requerida',
+                });
+            }
+
+            const { name } = req.body;
+
+            if (
+                typeof name !== 'string' ||
+                !name.trim()
+            )
+            {
+                return res.status(400).json({
+                    error: 'El nombre es obligatorio',
+                });
+            }
+
+            const normalizedName = name.trim();
+
+            if (normalizedName.length > 100)
+            {
+                return res.status(400).json({
+                    error: 'El nombre es demasiado largo',
+                });
+            }
+
+            const previousUser =
+                await prisma.user.findUnique({
+                    where: {
+                        id: userId,
+                    },
+                    select: {
+                        avatarUrl: true,
+                    },
+                });
+
+            if (!previousUser)
+            {
+                return res.status(404).json({
+                    error: 'Usuario no encontrado',
+                });
+            }
+
+            let newAvatarUrl: string | undefined;
+
+            if (file)
+            {
+                const extension =
+                    file.mimetype === 'image/png'
+                        ? 'png'
+                        : file.mimetype === 'image/webp'
+                            ? 'webp'
+                            : 'jpg';
+
+                newAvatarPath =
+                    `users/${userId}/${randomUUID()}.${extension}`;
+
+                const {
+                    error: uploadError,
+                } = await supabase.storage
+                    .from('avatars')
+                    .upload(
+                        newAvatarPath,
+                        file.buffer,
+                        {
+                            contentType: file.mimetype,
+                            upsert: false,
+                        }
+                    );
+
+                if (uploadError)
+                {
+                    console.error(uploadError);
+
+                    return res.status(500).json({
+                        error: 'No se pudo subir la imagen',
+                    });
+                }
+
+                const {
+                    data: publicUrlData,
+                } = supabase.storage
+                    .from('avatars')
+                    .getPublicUrl(newAvatarPath);
+
+                newAvatarUrl = publicUrlData.publicUrl;
+            }
+
+            const updatedUser =
+                await prisma.user.update({
+                    where: {
+                        id: userId,
+                    },
+                    data: {
+                        name: normalizedName,
+                        ...(newAvatarUrl
+                            ? { avatarUrl: newAvatarUrl }
+                            : {}),
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        avatarUrl: true,
+                    },
+                });
+
+            newAvatarPath = null;
+
+            return res.json(updatedUser);
+        }
+        catch (error)
+        {
+            console.error(error);
+
+            if (newAvatarPath)
+            {
+                const {
+                    error: cleanupError,
+                } = await supabase.storage
+                    .from('avatars')
+                    .remove([newAvatarPath]);
+
+                if (cleanupError)
+                {
+                    console.error(
+                        'No se pudo limpiar la imagen nueva:',
+                        cleanupError
+                    );
+                }
+            }
+
+            return res.status(500).json({
+                error: 'No se pudo actualizar el perfil',
             });
         }
     }

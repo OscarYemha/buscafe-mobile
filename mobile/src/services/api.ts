@@ -139,6 +139,8 @@ export type CreateReviewData = {
     goodForWork?: boolean;
     goodForStudy?: boolean;
     goodForDate?: boolean;
+
+    idempotencyKey: string;
 };
 
 export async function createReview(
@@ -165,8 +167,12 @@ export async function createReview(
 
     if (!response.ok)
     {
+        const result = await response.json().catch(() => null);
+
         throw new Error(
-            'No se pudo publicar la reseña'
+            typeof result?.error === 'string'
+                ? result.error
+                : 'No se pudo publicar la reseña'
         );
     }
 
@@ -749,4 +755,64 @@ export async function removeFavorite(
     {
         throw new Error('No se pudo quitar de favoritos');
     }
+}
+
+export async function updateProfileWithAvatar(
+    token: string,
+    name: string,
+    imageUri?: string
+): Promise<AuthUser>
+{
+    const formData = new FormData();
+
+    formData.append('name', name);
+
+    if (imageUri)
+    {
+        const fileName =
+            imageUri.split('/').pop() || 'avatar.jpg';
+
+        const extension =
+            fileName.split('.').pop()?.toLowerCase();
+
+        const mimeType =
+            extension === 'png'
+                ? 'image/png'
+                : extension === 'webp'
+                    ? 'image/webp'
+                    : 'image/jpeg';
+
+        formData.append(
+            'avatar',
+            {
+                uri: imageUri,
+                name: fileName,
+                type: mimeType
+            } as any
+        );
+    }
+
+    const response = await fetch(
+        `${API_URL}/users/me/profile`,
+        {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${token}`
+            },
+            body: formData
+        }
+    );
+
+    if (!response.ok)
+    {
+        const responseData =
+            await response.json().catch(() => null);
+
+        throw new Error(
+            responseData?.error ??
+            'No se pudo actualizar el perfil'
+        );
+    }
+
+    return response.json();
 }

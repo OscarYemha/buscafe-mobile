@@ -12,9 +12,10 @@ import {
     useEffect,
     useRef,
     useState,
+    type ComponentRef,
 } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Region } from 'react-native-maps';
+import MapView, { Callout, Marker, Region } from 'react-native-maps';
 import { useNearbyCafes } from '../context/NearbyCafesContext';
 import { getNearbyCafes } from '../services/api';
 import { CafeSummary } from '../types/CafeSummary';
@@ -60,15 +61,14 @@ export default function MapScreen(
     } = useNearbyCafes();
 
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
-    const [selectedCafePoint, setSelectedCafePoint] = useState<{ x: number; y: number } | null>(null);
     const [exploredRegion, setExploredRegion] = useState<Region | null>(null);
     const [showSearchAreaButton, setShowSearchAreaButton] = useState(false);
     const [explorationCafes, setExplorationCafes] = useState<CafeSummary[] | null>(null);
     const [explorationLoading, setExplorationLoading] = useState(false);
     const [explorationError, setExplorationError] = useState<string | null>(null);
-    const [mapSize, setMapSize] = useState({width: 0, height: 0,});
 
     const mapRef = useRef<MapView>(null);
+    const markerRefs = useRef<Record<string, ComponentRef<typeof Marker> | null>>({});
     const listRef = useRef<FlatList<CafeSummary>>(null);
     const programmaticMovementRef = useRef(false);
     const isMapGestureActiveRef = useRef(false);
@@ -79,7 +79,6 @@ export default function MapScreen(
         useCallback(() => {
             return () => {
                 setSelectedCafeId(null);
-                setSelectedCafePoint(null);
 
                 listRef.current?.scrollToOffset({
                     offset: 0,
@@ -109,66 +108,6 @@ export default function MapScreen(
 
         return a.distanceKm - b.distanceKm;
     });
-
-    const selectedCafe =
-    selectedCafeId !== null
-        ? sortedCafes.find(
-            (cafe) =>
-                cafe.googlePlaceId === selectedCafeId
-        ) ?? null
-        : null;
-
-    const CARD_WIDTH = 240;
-    const CARD_HEIGHT = 135;
-    const MAP_MARGIN = 12;
-
-    const selectedCardPosition =
-        selectedCafePoint && mapSize.width > 0 && mapSize.height > 0
-            ? {
-                left: Math.max(
-                    CARD_WIDTH / 2 + MAP_MARGIN,
-                    Math.min(
-                        selectedCafePoint.x,
-                        mapSize.width - CARD_WIDTH / 2 - MAP_MARGIN
-                    )
-                ),
-                top: Math.max(
-                    CARD_HEIGHT + MAP_MARGIN,
-                    Math.min(
-                        selectedCafePoint.y,
-                        mapSize.height - MAP_MARGIN
-                    )
-                ),
-            }
-            : null;
-
-    async function updateSelectedCafePoint(
-        cafe: CafeSummary
-    )
-    {
-        if (!mapRef.current)
-        {
-            return;
-        }
-
-        try
-        {
-            const point =
-                await mapRef.current.pointForCoordinate({
-                    latitude: cafe.latitude,
-                    longitude: cafe.longitude,
-                });
-
-            setSelectedCafePoint(point);
-        }
-        catch (error)
-        {
-            console.error(
-                'Error al calcular la posición del café seleccionado',
-                error
-            );
-        }
-    }
 
     useEffect(() => {
         if (
@@ -224,7 +163,6 @@ export default function MapScreen(
 
             setExplorationCafes(nearbyCafes);
             setSelectedCafeId(null);
-            setSelectedCafePoint(null);
 
             listRef.current?.scrollToOffset({
                 offset: 0,
@@ -268,7 +206,6 @@ export default function MapScreen(
         setShowSearchAreaButton(false);
         setExploredRegion(null);
         setSelectedCafeId(null);
-        setSelectedCafePoint(null);
 
         listRef.current?.scrollToOffset({
             offset: 0,
@@ -383,26 +320,21 @@ export default function MapScreen(
                         }}
                         showsUserLocation
                         showsMyLocationButton={false}
-                        onLayout={(event) => {
-                            const { width, height } = event.nativeEvent.layout;
-
-                            setMapSize({
-                                width,
-                                height,
-                            });
-                        }}
                         onPress={(event) => {
                             if (event.nativeEvent.action === 'marker-press') {
                                 return;
                             }
 
                             setSelectedCafeId(null);
-                            setSelectedCafePoint(null);
+                            if (selectedCafeId)
+                            {
+                                markerRefs.current[selectedCafeId]?.hideCallout();
+                            }
                         }}
-                        onRegionChange={(_region, details) => {
-                            setSelectedCafePoint(null);
-
-                            if (details?.isGesture === true) {
+                        onRegionChange={(_region, details) =>
+                        {
+                            if (details?.isGesture === true)
+                            {
                                 isMapGestureActiveRef.current = true;
                             }
                         }}
@@ -421,9 +353,9 @@ export default function MapScreen(
                             {
                                 programmaticMovementRef.current = false;
 
-                                if (selectedCafe)
+                                if (selectedCafeId)
                                 {
-                                    void updateSelectedCafePoint(selectedCafe);
+                                    markerRefs.current[selectedCafeId]?.showCallout();
                                 }
 
                                 return;
@@ -440,15 +372,22 @@ export default function MapScreen(
                                 setShowSearchAreaButton(true);
                             }
 
-                            if (selectedCafe)
-                            {
-                                void updateSelectedCafePoint(selectedCafe);
-                            }
                         }}
                     >
                         {sortedCafes.map((cafe) => (
                             <Marker
                                 key={cafe.googlePlaceId}
+                                ref={(marker) =>
+                                {
+                                    if (marker)
+                                    {
+                                        markerRefs.current[cafe.googlePlaceId] = marker;
+                                    }
+                                    else
+                                    {
+                                        delete markerRefs.current[cafe.googlePlaceId];
+                                    }
+                                }}
                                 image={
                                     selectedCafeId === cafe.googlePlaceId
                                         ? require('../../assets/cafe-marker-selected.png')
@@ -463,9 +402,9 @@ export default function MapScreen(
                                         ? 1000
                                         : 1
                                 }
-                                onPress={() => {
-                                    const cafeId =
-                                        cafe.googlePlaceId;
+                                onPress={() =>
+                                {
+                                    const cafeId = cafe.googlePlaceId;
 
                                     setSelectedCafeId(cafeId);
 
@@ -481,13 +420,12 @@ export default function MapScreen(
                                         350
                                     );
 
-                                    requestAnimationFrame(() => {
-                                        const currentIndex =
-                                            sortedCafes.findIndex(
-                                                (item) =>
-                                                    item.googlePlaceId ===
-                                                    cafeId
-                                            );
+                                    requestAnimationFrame(() =>
+                                    {
+                                        const currentIndex = sortedCafes.findIndex(
+                                            (item) =>
+                                                item.googlePlaceId === cafeId
+                                        );
 
                                         if (currentIndex < 0)
                                         {
@@ -501,27 +439,73 @@ export default function MapScreen(
                                         });
                                     });
                                 }}
-                            />
+                            >
+                                <Callout
+                                    tooltip={false}
+                                    onPress={() =>
+                                    {
+                                        navigation.navigate('CafeDetail', {
+                                            googlePlaceId: cafe.googlePlaceId,
+                                        });
+                                    }}
+                                >
+                                    <View style={styles.calloutContent}>
+                                        <Text
+                                            style={styles.selectedCafeName}
+                                            numberOfLines={2}
+                                            ellipsizeMode="tail"
+                                        >
+                                            {cafe.name}
+                                        </Text>
+
+                                        <Text
+                                            style={styles.selectedCafeAddress}
+                                            numberOfLines={1}
+                                            ellipsizeMode="tail"
+                                        >
+                                            {cafe.shortAddress}
+                                        </Text>
+
+                                        <Text style={styles.selectedCafeRating}>
+                                            Google ⭐{' '}
+                                            {cafe.googleRating !== null
+                                                ? cafe.googleRating.toFixed(1)
+                                                : 'Sin puntuación'}
+                                        </Text>
+
+                                        <Text style={styles.selectedCafeRating}>
+                                            BusCafé ⭐{' '}
+                                            {cafe.buscafeRating !== null
+                                                ? cafe.buscafeRating.toFixed(1)
+                                                : 'Sin puntuación'}
+                                        </Text>
+                                    </View>
+                                </Callout>
+                            </Marker>
                         ))}
                     </MapView>
                     <View
                         style={styles.mapControls}
                         pointerEvents="box-none"
                     >
-                        {showSearchAreaButton && (
-                            <TouchableOpacity
-                                style={styles.searchAreaButton}
-                                onPress={() => {
-                                    void searchInThisArea();
-                                }}
-                                disabled={explorationLoading}
+                        {showSearchAreaButton && !explorationLoading && (
+                            <View
+                                style={styles.searchAreaContainer}
+                                pointerEvents="box-none"
                             >
-                                <Text style={styles.searchAreaButtonText}>
-                                    Buscar en esta zona
-                                </Text>
-                            </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.searchAreaButton}
+                                    onPress={() =>
+                                    {
+                                        void searchInThisArea();
+                                    }}
+                                >
+                                    <Text style={styles.searchAreaButtonText}>
+                                        Buscar en esta zona
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         )}
-
                         <TouchableOpacity
                             style={styles.recenterButton}
                             onPress={returnToMyLocation}
@@ -547,55 +531,6 @@ export default function MapScreen(
                         <Text style={styles.explorationError}>
                             {explorationError}
                         </Text>
-                    )}
-                    {selectedCafe && selectedCardPosition && (
-                        <TouchableOpacity
-                            style={[
-                                styles.selectedCafeCard,
-                                {
-                                    left: selectedCardPosition.left,
-                                    top: selectedCardPosition.top,
-                                },
-                            ]}
-                            activeOpacity={0.85}
-                            onPress={() => {
-                                navigation.navigate(
-                                    'CafeDetail',
-                                    {
-                                        googlePlaceId:
-                                            selectedCafe.googlePlaceId,
-                                    }
-                                );
-                            }}
-                        >
-                            <Text style={styles.selectedCafeName}>
-                                {selectedCafe.name}
-                            </Text>
-
-                            <Text
-                                style={styles.selectedCafeAddress}
-                                numberOfLines={1}
-                                ellipsizeMode="tail"
-                            >
-                                {selectedCafe.shortAddress}
-                            </Text>
-
-                            <Text style={styles.selectedCafeRating}>
-                                Google ⭐{' '}
-                                {selectedCafe.googleRating !== null
-                                    ? selectedCafe.googleRating.toFixed(1)
-                                    : 'Sin puntuación'}
-                            </Text>
-
-                            <Text style={styles.selectedCafeRating}>
-                                BusCafé ⭐{' '}
-                                {selectedCafe.buscafeRating !== null
-                                    ? selectedCafe.buscafeRating.toFixed(1)
-                                    : 'Sin puntuación'}
-                            </Text>
-
-                            <View style={styles.selectedCafeArrow} />
-                        </TouchableOpacity>
                     )}
                     <View style={styles.listContainer}>
                         <Text style={styles.listTitle}>
@@ -761,45 +696,6 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
-    selectedCafeRatings: {
-        marginTop: 8,
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 14,
-    },
-
-    selectedCafeCard: {
-        position: 'absolute',
-        width: 240,
-        zIndex: 10,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderWidth: 1,
-        borderColor: '#E8D9C7',
-        elevation: 5,
-        transform: [
-            { translateX: -120 },
-            { translateY: -135 },
-        ],
-    },
-
-    selectedCafeArrow: {
-        position: 'absolute',
-        bottom: -9,
-        left: 110,
-        width: 18,
-        height: 18,
-        backgroundColor: '#FFFFFF',
-        borderRightWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: '#E8D9C7',
-        transform: [
-            { rotate: '45deg' },
-        ],
-    },
-
     selectedCafeName: {
         fontSize: 15,
         fontWeight: '700',
@@ -816,6 +712,12 @@ const styles = StyleSheet.create({
         marginTop: 2,
         fontSize: 13,
         color: '#4A2416',
+    },
+
+    calloutContent: {
+        width: 220,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
     },
 
     listContainer: {
@@ -958,6 +860,13 @@ const styles = StyleSheet.create({
         color: '#A13D32',
         padding: 12,
         borderRadius: 12,
+        zIndex: 15,
+    },
+
+    searchAreaContainer: {
+        position: 'absolute',
+        top: 70,
+        alignSelf: 'center',
         zIndex: 15,
     },
 });

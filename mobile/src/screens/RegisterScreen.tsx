@@ -16,6 +16,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamlist } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../utils/errorMessages';
 
 type Props =
     NativeStackScreenProps<
@@ -96,9 +97,10 @@ export default function RegisterScreen({
         catch (error)
         {
             setError(
-                error instanceof Error
-                    ? error.message
-                    : 'No se pudo crear la cuenta'
+                getErrorMessage(
+                    error,
+                    'No se pudo crear la cuenta. Intentá nuevamente.'
+                )
             );
         }
         finally

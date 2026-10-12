@@ -12,7 +12,7 @@ import {
 import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 
 export default function ChangePasswordScreen()
@@ -21,26 +21,15 @@ export default function ChangePasswordScreen()
         changeProfilePassword,
     } = useAuth();
 
-    const [currentPassword, setCurrentPassword] =
-        useState('');
+    const navigation = useNavigation();
 
-    const [newPassword, setNewPassword] =
-        useState('');
-
-    const [confirmPassword, setConfirmPassword] =
-        useState('');
-
-    const [showCurrentPassword, setShowCurrentPassword] =
-        useState(false);
-
-    const [showNewPassword, setShowNewPassword] =
-        useState(false);
-
-    const [showConfirmPassword, setShowConfirmPassword] =
-        useState(false);
-
-    const [saving, setSaving] =
-        useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     async function handleChangePassword()
     {
@@ -88,6 +77,32 @@ export default function ChangePasswordScreen()
             return;
         }
 
+        Alert.alert(
+            'Confirmar cambio de contraseña',
+            '¿Querés cambiar tu contraseña?',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Confirmar',
+                    onPress: () =>
+                    {
+                        void savePassword();
+                    },
+                },
+            ]
+        );
+    }
+
+    async function savePassword()
+    {
+        if (saving)
+        {
+            return;
+        }
+
         try
         {
             setSaving(true);
@@ -103,7 +118,16 @@ export default function ChangePasswordScreen()
 
             Alert.alert(
                 'Contraseña actualizada',
-                'Tu contraseña se actualizó correctamente.'
+                'Tu contraseña se actualizó correctamente.',
+                [
+                    {
+                        text: 'Aceptar',
+                        onPress: () =>
+                        {
+                            navigation.goBack();
+                        },
+                    },
+                ]
             );
         }
         catch (error)

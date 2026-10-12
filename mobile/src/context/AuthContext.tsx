@@ -6,6 +6,7 @@ import {
     useState
 } from "react";
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     AuthUser,
     changePassword,
@@ -19,6 +20,7 @@ import {
     uploadAvatar,
     verifyEmail,
     requestEmailChange,
+    updateProfileWithAvatar,
     verifyEmailChange,
 } from "../services/api";
 
@@ -61,6 +63,11 @@ type AuthContextType = {
 
     updateUser: (
         updatedUser: AuthUser
+    ) => Promise<void>;
+
+    updateProfileDetails: (
+        name: string,
+        imageUri?: string
     ) => Promise<void>;
 
     changeProfilePassword: (
@@ -338,6 +345,32 @@ export function AuthProvider({children, }: {children: ReactNode})
         await updateUser(updatedUser);
     };
 
+    const updateProfileDetails = async (
+        name: string,
+        imageUri?: string
+    ) => {
+        const token =
+            await SecureStore.getItemAsync(
+                TOKEN_KEY
+            );
+
+        if (!token)
+        {
+            throw new Error(
+                'No hay una sesión activa'
+            );
+        }
+
+        const updatedUser =
+            await updateProfileWithAvatar(
+                token,
+                name,
+                imageUri
+            );
+
+        await updateUser(updatedUser);
+    };
+
     const requestProfileEmailChange = async (
         email: string
     ) => {
@@ -428,6 +461,23 @@ export function AuthProvider({children, }: {children: ReactNode})
 
         try
         {
+            if (user?.id !== undefined)
+            {
+                await AsyncStorage.removeItem(
+                    `buscafe_favorites_${user.id}`
+                );
+            }
+        }
+        catch (error)
+        {
+            console.error(
+                'ERROR ELIMINANDO CACHÉ DE FAVORITOS:',
+                error
+            );
+        }
+
+        try
+        {
             const results = await Promise.allSettled([
                 SecureStore.deleteItemAsync(TOKEN_KEY),
                 SecureStore.deleteItemAsync(USER_KEY),
@@ -486,6 +536,7 @@ export function AuthProvider({children, }: {children: ReactNode})
                 verifyProfileEmailChange,
                 updateAvatar,
                 updateProfileName,
+                updateProfileDetails,
                 changeProfilePassword,
                 deleteProfileAccount,
                 updateUser,

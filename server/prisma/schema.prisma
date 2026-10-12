@@ -61,6 +61,8 @@ model Review {
   goodForStudy Boolean?
   goodForDate  Boolean?
 
+  idempotencyKey String? @unique @db.Uuid
+
   userId Int?
   cafeId Int
 
