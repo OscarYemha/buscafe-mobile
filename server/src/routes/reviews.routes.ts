@@ -132,6 +132,11 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) =>
 
         const findExisting = async () =>
         {
+            if (idempotencyKey === undefined)
+            {
+                return null;
+            }
+
             return prisma.review.findUnique({
                 where: {
                     idempotencyKey,
@@ -204,6 +209,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) =>
         catch (error)
         {
             if (
+                idempotencyKey !== undefined &&
                 error instanceof Prisma.PrismaClientKnownRequestError &&
                 error.code === 'P2002'
             )
