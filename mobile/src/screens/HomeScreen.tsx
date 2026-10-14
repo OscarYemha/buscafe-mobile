@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Linking,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -61,6 +62,37 @@ export default function HomeScreen({navigation}: Props) {
   } = useFavorites();
 
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
+
+  const handleRefresh = useCallback(async () =>
+  {
+      if (refreshingRef.current || loading)
+      {
+          return;
+      }
+
+      refreshingRef.current = true;
+      setRefreshing(true);
+
+      try
+      {
+          await refreshNearbyCafes();
+      }
+      catch (error)
+      {
+          console.error(
+              'Error al actualizar cafeterías cercanas:',
+              error
+          );
+      }
+      finally
+      {
+          refreshingRef.current = false;
+          setRefreshing(false);
+      }
+  }, [loading, refreshNearbyCafes]);
 
   const handleFavoritePress = async (
     cafe: CafeSummary
@@ -114,6 +146,14 @@ export default function HomeScreen({navigation}: Props) {
           ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={['#6B3A22']}
+                tintColor="#6B3A22"
+            />
+        }
           onScroll={(event) => {
             const offsetY =
               event.nativeEvent.contentOffset.y;
@@ -206,7 +246,7 @@ export default function HomeScreen({navigation}: Props) {
             </View>
           )}
 
-          {!loading && !error && (
+          {cafes.length > 0 && (
             <View style={styles.cafesContainer}>
               {cafes.slice(0, 5).map((cafe) => (
                 <NearbyCafeCard
@@ -225,9 +265,7 @@ export default function HomeScreen({navigation}: Props) {
               ))}
             </View>
           )}
-          {!loading &&
-            !error && 
-            cafes.length > 5 && 
+          {cafes.length > 5 &&
             userLocation && (
             <TouchableOpacity
               style={styles.showAllButton}

@@ -2,6 +2,7 @@ import {
     Image,
     Linking,
     Modal,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -40,8 +41,11 @@ export default function CafeDetailScreen({ route, navigation }: Props)
     const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
     const [modalSize, setModalSize] = useState({ width: 0, height: 0 });
     const [loadedPhotoSizes, setLoadedPhotoSizes] = useState<Record<string, { width: number; height: number }>>({});
+
+    const requestInProgress = useRef(false);
 
     useEffect(() =>
     {
@@ -97,35 +101,62 @@ export default function CafeDetailScreen({ route, navigation }: Props)
         });
     };
 
-    useFocusEffect(
-        useCallback(() => {
-            async function loadCafe()
+    const hasLoadedCafe = useRef(false);
+
+    const loadCafe = useCallback(async (isRefreshing = false) =>
+    {
+        if (requestInProgress.current)
+        {
+            return;
+        }
+
+        requestInProgress.current = true;
+
+        try
+        {
+            if (isRefreshing)
             {
-                try
-                {
-                    setLoading(true);
-                    setError(null);
-                    const cafeDetails =
-                        await getCafeDetails(
-                            googlePlaceId
-                        );
-                    setCafe(cafeDetails);
-                }
-                catch (error)
-                {
-                    console.error(error);
-                    setError(
-                        'No se pudo cargar la cafetería'
-                    );
-                }
-                finally
-                {
-                    setLoading(false);
-                }
+                setRefreshing(true);
             }
+            else if (!hasLoadedCafe.current)
+            {
+                setLoading(true);
+            }
+
+            setError(null);
+
+            const cafeDetails = await getCafeDetails(googlePlaceId);
+
+            setCafe(cafeDetails);
+            hasLoadedCafe.current = true;
+        }
+        catch (error)
+        {
+            console.error('Error al cargar cafetería:', error);
+
+            setError(
+                'No se pudo actualizar la información de la cafetería'
+            );
+        }
+        finally
+        {
+            setLoading(false);
+            setRefreshing(false);
+            requestInProgress.current = false;
+        }
+    }, [googlePlaceId]);
+
+    useFocusEffect(
+        useCallback(() =>
+        {
             loadCafe();
-        }, [googlePlaceId])
+        }, [loadCafe])
     );
+
+    const handleRefresh = useCallback(() =>
+    {
+        loadCafe(true);
+    }, [loadCafe]);
 
     if (loading)
     {
@@ -141,7 +172,7 @@ export default function CafeDetailScreen({ route, navigation }: Props)
         );
     }
 
-    if (error || !cafe)
+    if (!cafe)
     {
         return (
             <SafeAreaView
@@ -151,6 +182,14 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                 <Text style={styles.title}>
                     {error ?? 'Cafetería no encontrada'}
                 </Text>
+                <TouchableOpacity
+                    onPress={handleRefresh}
+                    style={styles.refreshErrorContainer}
+                >
+                    <Text style={styles.refreshErrorText}>
+                        Reintentar
+                    </Text>
+                </TouchableOpacity>
             </SafeAreaView>
         );
     }
@@ -206,7 +245,25 @@ export default function CafeDetailScreen({ route, navigation }: Props)
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={['#6B3A22']}
+                        tintColor="#6B3A22"
+                    />
+                }
             >
+                {error && (
+                    <TouchableOpacity
+                        onPress={handleRefresh}
+                        style={styles.refreshErrorContainer}
+                    >
+                        <Text style={styles.refreshErrorText}>
+                            {error}. Tocá para reintentar.
+                        </Text>
+                    </TouchableOpacity>
+                )}
                 <View style={styles.titleRow}>
                     <Text style={styles.title}>
                         {cafe.name}
@@ -1098,5 +1155,18 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#4A2416',
         maxWidth: 240,
+    },
+
+    refreshErrorContainer: {
+        marginTop: 12,
+        padding: 12,
+        borderRadius: 10,
+        backgroundColor: '#FCE8E6',
+    },
+
+    refreshErrorText: {
+        color: '#A13D32',
+        fontSize: 14,
+        textAlign: 'center',
     },
 });

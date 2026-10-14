@@ -84,40 +84,29 @@ export function NearbyCafesProvider(
     { children }: Props
 )
 {
-    const [userLocation, setUserLocation] =
-        useState<UserLocation | null>(null);
+    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
 
-    const [cafes, setCafes] =
-        useState<CafeSummary[]>([]);
+    const [cafes, setCafes] = useState<CafeSummary[]>([]);
 
-    const [loading, setLoading] =
-        useState(true);
+    const [loading, setLoading] = useState(true);
 
-    const [error, setError] =
-        useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const [
-        canAskLocationAgain,
-        setCanAskLocationAgain,
-    ] = useState(true);
+    const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
 
-    const selectedLocationRef =
-        useRef<UserLocation | null>(null);
+    const selectedLocationRef = useRef<UserLocation | null>(null);
 
-    const movementCandidateRef =
-        useRef<UserLocation | null>(null);
+    const movementCandidateRef = useRef<UserLocation | null>(null);
 
-    const lastAutoRefreshRef =
-        useRef(0);
+    const lastAutoRefreshRef = useRef(0);
 
-    const autoRefreshInProgressRef =
-        useRef(false);
+    const autoRefreshInProgressRef = useRef(false);
 
-    const waitingForLocationSettings =
-        useRef(false);
+    const waitingForLocationSettings = useRef(false);
 
-    const requestIdRef =
-        useRef(0);
+    const requestIdRef = useRef(0);
+
+    const manualRefreshInProgressRef = useRef(false);
 
     const updateNearbyCafesFromLocation =
         useCallback(
@@ -187,25 +176,34 @@ export function NearbyCafesProvider(
         );
 
     const refreshNearbyCafes =
-        useCallback(async () => {
+        useCallback(async () =>
+        {
+            if (manualRefreshInProgressRef.current)
+            {
+                return;
+            }
+
+            manualRefreshInProgressRef.current = true;
+
+            const requestId = ++requestIdRef.current;
+
             setLoading(true);
             setError(null);
 
             try
             {
-                const result =
-                    await getCurrentLocation();
+                const result = await getCurrentLocation();
+
+                if (requestId !== requestIdRef.current)
+                {
+                    return;
+                }
 
                 if (result.status === 'denied')
                 {
-                    ++requestIdRef.current;
-
                     setUserLocation(null);
                     setCafes([]);
-
-                    setCanAskLocationAgain(
-                        result.canAskAgain
-                    );
+                    setCanAskLocationAgain(result.canAskAgain);
 
                     setError(
                         result.canAskAgain
@@ -216,20 +214,14 @@ export function NearbyCafesProvider(
                     return;
                 }
 
-                const location =
-                    result.location;
+                const location = result.location;
 
                 setCanAskLocationAgain(true);
 
-                selectedLocationRef.current =
-                    location;
+                selectedLocationRef.current = location;
+                movementCandidateRef.current = null;
 
-                movementCandidateRef.current =
-                    null;
-
-                await updateNearbyCafesFromLocation(
-                    location
-                );
+                await updateNearbyCafesFromLocation(location);
             }
             catch (error)
             {
@@ -238,12 +230,16 @@ export function NearbyCafesProvider(
                     error
                 );
 
-                setError(
-                    'No se pudieron cargar las cafeterías cercanas.'
-                );
+                if (requestId === requestIdRef.current)
+                {
+                    setError(
+                        'No se pudieron cargar las cafeterías cercanas.'
+                    );
+                }
             }
             finally
             {
+                manualRefreshInProgressRef.current = false;
                 setLoading(false);
             }
         }, [updateNearbyCafesFromLocation]);
@@ -254,7 +250,8 @@ export function NearbyCafesProvider(
                 const now = Date.now();
 
                 if (
-                    autoRefreshInProgressRef.current
+                    autoRefreshInProgressRef.current ||
+                    manualRefreshInProgressRef.current
                 )
                 {
                     return;

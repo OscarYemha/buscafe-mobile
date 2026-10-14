@@ -1,69 +1,132 @@
-import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity,View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { RootStackParamlist } from "../navigation/AppNavigator";
-import { cafeIntents } from "../data/cafeIntents";
-import { getNearbyCafes } from "../services/api";
-import { CafeSummary } from "../types/CafeSummary";
-import NearbyCafeCard from "../components/NearbyCafeCard";
-import { useAuth } from "../context/AuthContext";
-import { useFavorites } from "../context/FavoritesContext";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamlist } from '../navigation/AppNavigator';
+import { cafeIntents } from '../data/cafeIntents';
+import { getNearbyCafes } from '../services/api';
+import { CafeSummary } from '../types/CafeSummary';
+import NearbyCafeCard from '../components/NearbyCafeCard';
+import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
+import CafeSortSelector from '../components/CafeSortSelector';
+import { CafeSortOption, sortCafes } from '../utils/sortCafes';
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'Results'>;
 
-export default function ResultsScreen({ route, navigation }: Props) {
-    const {
-        intent,
-        latitude,
-        longitude,
-    } = route.params;
+
+export default function ResultsScreen({ route, navigation }: Props)
+{
+    const { intent, latitude, longitude } = route.params;
 
     const scrollViewRef = useRef<ScrollView>(null);
+    const requestIdRef = useRef(0);
+    const refreshingRef = useRef(false);
+    const requestInProgressRef = useRef(false);
 
     const { isAuthenticated } = useAuth();
-
     const { isFavorite, toggleFavorite } = useFavorites();
 
     const [cafes, setCafes] = useState<CafeSummary[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showScrollTop, setShowScrollTop] = useState(false);
+    const [sortBy, setSortBy] = useState<CafeSortOption>('distance');
 
-    useEffect(() => {
-        async function loadNearbyCafes() 
+    const loadNearbyCafes = useCallback(async (
+        isRefreshing = false
+    ) =>
+    {
+        if (isRefreshing && requestInProgressRef.current)
         {
-            try
+            return;
+        }
+
+        const requestId = ++requestIdRef.current;
+
+        requestInProgressRef.current = true;
+
+        if (isRefreshing)
+        {
+            refreshingRef.current = true;
+            setRefreshing(true);
+        }
+        else
+        {
+            setLoading(true);
+            setRefreshing(false);
+            refreshingRef.current = false;
+        }
+
+        setError(null);
+
+        try
+        {
+            const nearbyCafes = await getNearbyCafes(
+                latitude,
+                longitude,
+                intent
+            );
+
+            if (requestId !== requestIdRef.current)
             {
-                setLoading(true);
-                setError(null);
-
-                const nearbyCafes = await getNearbyCafes(
-                    latitude,
-                    longitude,
-                    intent
-                );
-
-                setCafes(nearbyCafes);
+                return;
             }
-            catch (error)
-            {
-                console.error('Error al obtener las cafeterías cercanas: ', error);
 
-                setError('No se pudieron cargar las cafeterías');
-            }
-            finally
+            setCafes(nearbyCafes);
+        }
+        catch (error)
+        {
+            console.error(
+                'Error al obtener las cafeterías cercanas:',
+                error
+            );
+
+            if (requestId === requestIdRef.current)
             {
+                setError('No se pudieron actualizar las cafeterías.');
+            }
+        }
+        finally
+        {
+            if (requestId === requestIdRef.current)
+            {
+                requestInProgressRef.current = false;
+                refreshingRef.current = false;
+                setRefreshing(false);
                 setLoading(false);
             }
         }
-
-        loadNearbyCafes();
     }, [latitude, longitude, intent]);
 
-    const handleFavoritePress = async (
-        cafe: CafeSummary
-    ) => {
+    useEffect(() =>
+    {
+        void loadNearbyCafes();
+
+        return () =>
+        {
+            ++requestIdRef.current;
+            requestInProgressRef.current = false;
+            refreshingRef.current = false;
+        };
+    }, [loadNearbyCafes]);
+
+    const handleRefresh = useCallback(() =>
+    {
+        void loadNearbyCafes(true);
+    }, [loadNearbyCafes]);
+
+    const handleFavoritePress = async (cafe: CafeSummary) =>
+    {
         if (!isAuthenticated)
         {
             navigation.navigate('Login');
@@ -76,19 +139,22 @@ export default function ResultsScreen({ route, navigation }: Props) {
         }
         catch (error)
         {
-            console.error('Error al actualizar favorito', error);
+            console.error('Error al actualizar favorito:', error);
         }
     };
 
     const intentOption = intent
-        ? cafeIntents.find(
-        (option) => option.id === intent
-    )
-    : undefined;
+        ? cafeIntents.find((option) => option.id === intent)
+        : undefined;
 
     const title = intentOption
         ? `Cafés para ${intentOption.description}`
         : 'Cafés cerca de vos';
+
+    const sortedCafes = useMemo(() =>
+    {
+        return sortCafes(cafes, sortBy);
+    }, [cafes, sortBy]);
 
     return (
         <SafeAreaView
@@ -101,28 +167,51 @@ export default function ResultsScreen({ route, navigation }: Props) {
                     Encontrá la cafetería ideal para tu momento.
                 </Text>
             </View>
+
+            <View style={styles.sortContainer}>
+                <CafeSortSelector
+                    value={sortBy}
+                    onChange={setSortBy}
+                />
+            </View>
+
             <ScrollView
                 ref={scrollViewRef}
+                style={styles.scrollView}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
-                onScroll={(event) => {
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={['#6B3A22']}
+                        tintColor="#6B3A22"
+                    />
+                }
+                onScroll={(event) =>
+                {
                     const offsetY =
                         event.nativeEvent.contentOffset.y;
 
                     setShowScrollTop(offsetY > 500);
                 }}
                 scrollEventThrottle={16}
-                >
-                {loading && (
+            >
+                {loading && cafes.length === 0 && (
                     <Text style={styles.message}>
                         Buscando cafeterías...
                     </Text>
                 )}
 
                 {error && (
-                    <Text style={styles.error}>
-                        {error}
-                    </Text>
+                    <TouchableOpacity
+                        style={styles.errorContainer}
+                        onPress={handleRefresh}
+                    >
+                        <Text style={styles.error}>
+                            {error} Tocá para reintentar.
+                        </Text>
+                    </TouchableOpacity>
                 )}
 
                 {!loading && !error && cafes.length === 0 && (
@@ -132,21 +221,24 @@ export default function ResultsScreen({ route, navigation }: Props) {
                         </Text>
 
                         <Text style={styles.emptyText}>
-                            Aún no hay suficientes datos para recomendarte
-                            cafeterías ideales para {intentOption?.description}.
+                            {intentOption
+                                ? `Aún no hay suficientes datos para recomendarte cafeterías ideales para ${intentOption.description}.`
+                                : 'No encontramos cafeterías cercanas en esta zona.'}
                         </Text>
                     </View>
                 )}
 
-                {!loading && !error && cafes.map((cafe) => (
+                {sortedCafes.map((cafe) => (
                     <NearbyCafeCard
                         key={cafe.googlePlaceId}
                         cafe={cafe}
                         isFavorite={isFavorite(cafe.googlePlaceId)}
-                        onFavoritePress={() => {
-                            handleFavoritePress(cafe);
+                        onFavoritePress={() =>
+                        {
+                            void handleFavoritePress(cafe);
                         }}
-                        onPress={() => {
+                        onPress={() =>
+                        {
                             navigation.navigate('CafeDetail', {
                                 googlePlaceId: cafe.googlePlaceId,
                             });
@@ -154,10 +246,12 @@ export default function ResultsScreen({ route, navigation }: Props) {
                     />
                 ))}
             </ScrollView>
+
             {showScrollTop && (
                 <TouchableOpacity
                     style={styles.scrollTopButton}
-                    onPress={() => {
+                    onPress={() =>
+                    {
                         scrollViewRef.current?.scrollTo({
                             y: 0,
                             animated: true,
@@ -184,7 +278,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 28,
         fontWeight: '700',
-        color: '#4A4216',
+        color: '#4A2416',
     },
 
     subtitle: {
@@ -193,7 +287,16 @@ const styles = StyleSheet.create({
         color: '#7A6254',
     },
 
+    sortContainer: {
+        marginTop: 20,
+    },
+
+    scrollView: {
+        flex: 1,
+    },
+
     list: {
+        flexGrow: 1,
         gap: 14,
         paddingTop: 20,
         paddingBottom: 30,
@@ -204,8 +307,14 @@ const styles = StyleSheet.create({
         color: '#7A6254',
     },
 
+    errorContainer: {
+        padding: 12,
+        borderRadius: 10,
+        backgroundColor: '#FCE8E6',
+    },
+
     error: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#A13D32',
     },
 
@@ -245,5 +354,15 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '600',
+    },
+
+    sortStar: {
+        color: '#6B3A22',
+        fontSize: 17,
+    },
+
+    sortStarActive: {
+        color: '#F8E6CF',
+        fontSize: 17,
     },
 });

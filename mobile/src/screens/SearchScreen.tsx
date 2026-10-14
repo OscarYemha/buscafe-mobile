@@ -1,5 +1,6 @@
 import {
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from 'react';
@@ -17,26 +18,19 @@ import {
     useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import {
-    NativeStackScreenProps,
-} from '@react-navigation/native-stack';
-
-import {
-    RootStackParamlist,
-} from '../navigation/AppNavigator';
-import {
-    searchCafes,
-} from '../services/api';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamlist } from '../navigation/AppNavigator';
+import { searchCafes } from '../services/api';
 import {
     getCurrentLocation,
     UserLocation,
 } from '../services/location';
-import {
-    CafeSummary,
-} from '../types/CafeSummary';
+import { CafeSummary } from '../types/CafeSummary';
 import NearbyCafeCard from '../components/NearbyCafeCard';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import CafeSortSelector from '../components/CafeSortSelector';
+import { CafeSortOption, sortCafes } from '../utils/sortCafes';
 
 type Props =
     NativeStackScreenProps<
@@ -85,6 +79,14 @@ export default function SearchScreen(
 
     const [showScrollTop, setShowScrollTop] =
         useState(false);
+
+    const [sortBy, setSortBy] =
+        useState<CafeSortOption>('distance');
+
+    const sortedSearchResults = useMemo(() =>
+    {
+        return sortCafes(searchResults, sortBy);
+    }, [searchResults, sortBy]);
 
     useEffect(() => {
         async function loadLocation()
@@ -141,30 +143,7 @@ export default function SearchScreen(
                             userLocation?.longitude,
                         );
 
-                    setSearchResults(
-                        [...result.cafes].sort(
-                            (a, b) => {
-                                if (
-                                    a.distanceKm === null
-                                )
-                                {
-                                    return 1;
-                                }
-
-                                if (
-                                    b.distanceKm === null
-                                )
-                                {
-                                    return -1;
-                                }
-
-                                return (
-                                    a.distanceKm -
-                                    b.distanceKm
-                                );
-                            }
-                        )
-                    );
+                    setSearchResults(result.cafes);
 
                     setNextPageToken(
                         result.nextPageToken
@@ -226,32 +205,13 @@ export default function SearchScreen(
                     userLocation?.longitude,
                 );
 
-            setSearchResults(
-                (currentResults) =>
-                    [
-                        ...currentResults,
-                        ...result.cafes,
-                    ].sort((a, b) => {
-                        if (
-                            a.distanceKm === null
-                        )
-                        {
-                            return 1;
-                        }
-
-                        if (
-                            b.distanceKm === null
-                        )
-                        {
-                            return -1;
-                        }
-
-                        return (
-                            a.distanceKm -
-                            b.distanceKm
-                        );
-                    })
-            );
+            setSearchResults((currentResults) =>
+            {
+                return [
+                    ...currentResults,
+                    ...result.cafes,
+                ];
+            });
 
             setNextPageToken(
                 result.nextPageToken
@@ -386,6 +346,18 @@ export default function SearchScreen(
                 )}
 
                 {searchText.trim().length >= 3 &&
+                    searchResults.length > 0 &&
+                    !searchLoading &&
+                    !searchError && (
+                        <View style={styles.sortContainer}>
+                            <CafeSortSelector
+                                value={sortBy}
+                                onChange={setSortBy}
+                            />
+                        </View>
+                    )}
+
+                {searchText.trim().length >= 3 &&
                     searchLoading && (
                         <Text style={styles.message}>
                             Buscando cafeterías...
@@ -418,7 +390,7 @@ export default function SearchScreen(
                                 </Text>
                             )}
 
-                            {searchResults.map(
+                            {sortedSearchResults.map(
                                 (cafe) => (
                                     <NearbyCafeCard
                                         key={
@@ -608,5 +580,10 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '600',
+    },
+
+    sortContainer: {
+        marginBottom: 20,
+        zIndex: 10,
     },
 });
