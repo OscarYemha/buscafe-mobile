@@ -910,29 +910,6 @@ router.patch(
     }
 );
 
-router.get('/', async (req, res) => {
-    try
-    {
-        const users = await prisma.user.findMany({
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                createdAt: true,
-            },
-        });
-
-        return res.json(users);
-    }
-    catch (error)
-    {
-        console.error(error);
-
-        return res.status(500).json({
-            error: 'No se pudieron obtener los usuarios',
-        });
-    }
-});
 
 const isValidEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
