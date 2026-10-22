@@ -12,10 +12,9 @@ import {
     useEffect,
     useRef,
     useState,
-    type ComponentRef,
 } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Callout, Marker, Region } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
 import { useNearbyCafes } from '../context/NearbyCafesContext';
 import { getNearbyCafes } from '../services/api';
 import { CafeSummary } from '../types/CafeSummary';
@@ -37,6 +36,39 @@ import {
     RootStackParamlist,
 } from '../navigation/AppNavigator';
 
+
+type MapPoint = { x: number; y: number };
+
+const CARD_WIDTH = 252;
+const PIN_VERTICAL_OFFSET = 36;
+
+// Proyección de Mercator para acompañar el gesto sin esperar al puente nativo.
+function mercatorY(latitude: number): number
+{
+    const lat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
+    const radians = lat * Math.PI / 180;
+    return Math.log(Math.tan(Math.PI / 4 + radians / 2));
+}
+
+function projectCafe(
+    latitude: number,
+    longitude: number,
+    region: Region,
+    width: number,
+    height: number
+): MapPoint
+{
+    // Maneja el cruce del meridiano 180.
+    const diffLongitude = ((longitude - region.longitude + 540) % 360) - 180;
+    const top = mercatorY(region.latitude + region.latitudeDelta / 2);
+    const bottom = mercatorY(region.latitude - region.latitudeDelta / 2);
+    const spanY = top - bottom;
+    return {
+        x: width / 2 + (diffLongitude / region.longitudeDelta) * width,
+        y: spanY === 0 ? height / 2 :
+            (top - mercatorY(latitude)) / spanY * height,
+    };
+}
 
 type Props = CompositeScreenProps<
     BottomTabScreenProps<
@@ -68,12 +100,17 @@ export default function MapScreen(
     const [explorationError, setExplorationError] = useState<string | null>(null);
 
     const mapRef = useRef<MapView>(null);
-    const markerRefs = useRef<Record<string, ComponentRef<typeof Marker> | null>>({});
     const listRef = useRef<FlatList<CafeSummary>>(null);
     const programmaticMovementRef = useRef(false);
     const isMapGestureActiveRef = useRef(false);
     const isExploringMapRef = useRef(false);
     const explorationRequestIdRef = useRef(0);
+    const currentRegionRef = useRef<Region | null>(null);
+    const projectionEpochRef = useRef(0);
+    const lastPopupUpdateRef = useRef(0);
+    const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+    const [popupHeight, setPopupHeight] = useState(0);
+    const [popupPoint, setPopupPoint] = useState<(MapPoint & { id: string }) | null>(null);
 
     useFocusEffect(
         useCallback(() => {
@@ -89,6 +126,10 @@ export default function MapScreen(
     );
 
     const displayedCafes = explorationCafes ?? cafes;
+
+    const selectedCafe = displayedCafes.find(
+        cafe => cafe.googlePlaceId === selectedCafeId
+    ) ?? null;
 
     const sortedCafes = [...displayedCafes].sort((a, b) => {
         if (a.distanceKm === null && b.distanceKm === null)
@@ -108,6 +149,56 @@ export default function MapScreen(
 
         return a.distanceKm - b.distanceKm;
     });
+
+    // Calculamos solo la posición de la cafetería seleccionada.
+    // Al terminar el gesto, corregimos usando la proyección real de Google Maps.
+    function updatePopupPosition(region: Region, cafe: CafeSummary | null)
+    {
+        currentRegionRef.current = region;
+        ++projectionEpochRef.current;
+        if (!cafe || !mapSize.width || !mapSize.height)
+        {
+            setPopupPoint(null);
+            return;
+        }
+        const point = projectCafe(
+            cafe.latitude, cafe.longitude,
+            region, mapSize.width, mapSize.height
+        );
+        setPopupPoint({ ...point, id: cafe.googlePlaceId });
+    }
+
+    function syncPopupWithNativeMap(cafe: CafeSummary | null)
+    {
+        if (!cafe || !mapRef.current)
+        {
+            return;
+        }
+        const epoch = ++projectionEpochRef.current;
+        void mapRef.current.pointForCoordinate({
+            latitude: cafe.latitude,
+            longitude: cafe.longitude,
+        }).then(point => {
+            if (projectionEpochRef.current !== epoch)
+            {
+                return;
+            }
+            setPopupPoint({ ...point, id: cafe.googlePlaceId });
+        }).catch(error => {
+            console.warn('No se pudo proyectar el pin seleccionado:', error);
+        });
+    }
+
+    useEffect(() => {
+        if (currentRegionRef.current)
+        {
+            updatePopupPosition(currentRegionRef.current, selectedCafe);
+        }
+        else
+        {
+            setPopupPoint(null);
+        }
+    }, [selectedCafeId, mapSize.width, mapSize.height]);
 
     useEffect(() => {
         if (
@@ -298,6 +389,10 @@ export default function MapScreen(
                     <MapView
                         ref={mapRef}
                         style={styles.map}
+                        onLayout={event => {
+                            const { width, height } = event.nativeEvent.layout;
+                            setMapSize({ width, height });
+                        }}
                         mapType="standard"
                         customMapStyle={[
                             {
@@ -326,16 +421,21 @@ export default function MapScreen(
                             }
 
                             setSelectedCafeId(null);
-                            if (selectedCafeId)
-                            {
-                                markerRefs.current[selectedCafeId]?.hideCallout();
-                            }
+                            setPopupPoint(null);
                         }}
-                        onRegionChange={(_region, details) =>
+                        onRegionChange={(region, details) =>
                         {
                             if (details?.isGesture === true)
                             {
                                 isMapGestureActiveRef.current = true;
+                            }
+                            currentRegionRef.current = region;
+                            // Máximo ~30 actualizaciones/segundo durante el gesto.
+                            const now = Date.now();
+                            if (now - lastPopupUpdateRef.current >= 33)
+                            {
+                                lastPopupUpdateRef.current = now;
+                                updatePopupPosition(region, selectedCafe);
                             }
                         }}
                         onRegionChangeComplete={(
@@ -344,6 +444,8 @@ export default function MapScreen(
                         ) => {
                             isMapGestureActiveRef.current = false;
                             setExploredRegion(region);
+                            updatePopupPosition(region, selectedCafe);
+                            syncPopupWithNativeMap(selectedCafe);
 
                             if (details?.isGesture === true)
                             {
@@ -352,11 +454,6 @@ export default function MapScreen(
                             else if (programmaticMovementRef.current)
                             {
                                 programmaticMovementRef.current = false;
-
-                                if (selectedCafeId)
-                                {
-                                    markerRefs.current[selectedCafeId]?.showCallout();
-                                }
 
                                 return;
                             }
@@ -374,138 +471,138 @@ export default function MapScreen(
 
                         }}
                     >
-                        {sortedCafes.map((cafe) => (
-                            <Marker
-                                key={cafe.googlePlaceId}
-                                ref={(marker) =>
+
+                    {sortedCafes.map((cafe) => (
+                        <Marker
+                            key={cafe.googlePlaceId}
+                            image={
+                                selectedCafeId === cafe.googlePlaceId
+                                    ? require('../../assets/cafe-marker-selected.png')
+                                    : require('../../assets/cafe-marker.png')
+                            }
+                            coordinate={{
+                                latitude: cafe.latitude,
+                                longitude: cafe.longitude,
+                            }}
+                            zIndex={
+                                selectedCafeId === cafe.googlePlaceId
+                                    ? 1000
+                                    : 1
+                            }
+                            onPress={() =>
+                            {
+                                const cafeId = cafe.googlePlaceId;
+
+                                setSelectedCafeId(cafeId);
+                                if (currentRegionRef.current)
                                 {
-                                    if (marker)
-                                    {
-                                        markerRefs.current[cafe.googlePlaceId] = marker;
-                                    }
-                                    else
-                                    {
-                                        delete markerRefs.current[cafe.googlePlaceId];
-                                    }
-                                }}
-                                image={
-                                    selectedCafeId === cafe.googlePlaceId
-                                        ? require('../../assets/cafe-marker-selected.png')
-                                        : require('../../assets/cafe-marker.png')
+                                    updatePopupPosition(currentRegionRef.current, cafe);
                                 }
-                                coordinate={{
-                                    latitude: cafe.latitude,
-                                    longitude: cafe.longitude,
-                                }}
-                                zIndex={
-                                    selectedCafeId === cafe.googlePlaceId
-                                        ? 1000
-                                        : 1
-                                }
-                                onPress={() =>
+                                programmaticMovementRef.current = true;
+
+                                mapRef.current?.animateToRegion(
+                                    {
+                                        latitude: cafe.latitude,
+                                        longitude: cafe.longitude,
+                                        latitudeDelta: 0.01,
+                                        longitudeDelta: 0.01,
+                                    },
+                                    350
+                                );
+
+                                requestAnimationFrame(() =>
                                 {
-                                    const cafeId = cafe.googlePlaceId;
-
-                                    setSelectedCafeId(cafeId);
-
-                                    programmaticMovementRef.current = true;
-
-                                    mapRef.current?.animateToRegion(
-                                        {
-                                            latitude: cafe.latitude,
-                                            longitude: cafe.longitude,
-                                            latitudeDelta: 0.01,
-                                            longitudeDelta: 0.01,
-                                        },
-                                        350
+                                    const currentIndex = sortedCafes.findIndex(
+                                        (item) =>
+                                            item.googlePlaceId === cafeId
                                     );
 
-                                    requestAnimationFrame(() =>
+                                    if (currentIndex < 0)
                                     {
-                                        const currentIndex = sortedCafes.findIndex(
-                                            (item) =>
-                                                item.googlePlaceId === cafeId
-                                        );
+                                        return;
+                                    }
 
-                                        if (currentIndex < 0)
-                                        {
-                                            return;
-                                        }
-
-                                        listRef.current?.scrollToIndex({
-                                            index: currentIndex,
-                                            animated: true,
-                                            viewPosition: 0.5,
-                                        });
+                                    listRef.current?.scrollToIndex({
+                                        index: currentIndex,
+                                        animated: true,
+                                        viewPosition: 0.5,
                                     });
-                                }}
+                                });
+                            }}
+                        />
+                    ))}
+
+                    </MapView>
+
+                    {selectedCafe && popupPoint?.id === selectedCafe.googlePlaceId &&
+                        popupPoint.x >= 0 && popupPoint.x <= mapSize.width &&
+                        popupPoint.y >= 0 && popupPoint.y <= mapSize.height && (
+                        <View
+                            pointerEvents="box-none"
+                            style={[
+                                styles.popupAnchor,
+                                {
+                                    left: popupPoint.x - CARD_WIDTH / 2,
+                                    top: popupPoint.y - PIN_VERTICAL_OFFSET,
+                                    transform: [{ translateY: -popupHeight }],
+                                    opacity: popupHeight ? 1 : 0,
+                                },
+                            ]}
+                            onLayout={event => {
+                                const height = event.nativeEvent.layout.height;
+                                if (Math.abs(height - popupHeight) > 1)
+                                {
+                                    setPopupHeight(height);
+                                }
+                            }}
+                        >
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Ver detalles de ${selectedCafe.name}`}
+                                style={styles.popupCard}
+                                onPress={() => navigation.navigate('CafeDetail', {
+                                    googlePlaceId: selectedCafe.googlePlaceId,
+                                })}
                             >
-                                <Callout
-                                    tooltip={false}
-                                    onPress={() =>
-                                    {
-                                        navigation.navigate('CafeDetail', {
-                                            googlePlaceId: cafe.googlePlaceId,
-                                        });
-                                    }}
-                                >
-                                    <View style={styles.calloutContent}>
-                                        <Text
-                                            style={styles.selectedCafeName}
-                                            numberOfLines={2}
-                                            ellipsizeMode="tail"
-                                        >
-                                            {cafe.name}
-                                        </Text>
-
-                                        <Text
-                                            style={styles.selectedCafeAddress}
-                                            numberOfLines={1}
-                                            ellipsizeMode="tail"
-                                        >
-                                            {cafe.shortAddress}
-                                        </Text>
-
-                                        <Text style={styles.selectedCafeRating}>
-                                            Google ⭐{' '}
-                                            {cafe.googleRating !== null
-                                                ? cafe.googleRating.toFixed(1)
-                                                : 'Sin puntuación'}
-                                        </Text>
-
-                                        <Text style={styles.selectedCafeRating}>
-                                            BusCafé ⭐{' '}
-                                            {cafe.buscafeRating !== null
-                                                ? cafe.buscafeRating.toFixed(1)
+                                <View style={styles.popupTitleRow}>
+                                    <Text style={styles.popupTitle} numberOfLines={2}>
+                                        {selectedCafe.name}
+                                    </Text>
+                                    <Text style={styles.popupCoffee}>☕</Text>
+                                </View>
+                                <Text style={styles.popupAddress} numberOfLines={1}>
+                                    📍 {selectedCafe.shortAddress}
+                                </Text>
+                                <View style={styles.popupDivider} />
+                                <View style={styles.popupRatingRow}>
+                                    <View style={styles.popupRatingColumn}>
+                                        <Text style={styles.popupRatingLabel}>Google</Text>
+                                        <Text style={styles.popupRatingValue}>
+                                            ★ {selectedCafe.googleRating !== null
+                                                ? selectedCafe.googleRating.toFixed(1)
                                                 : 'Sin puntuación'}
                                         </Text>
                                     </View>
-                                </Callout>
-                            </Marker>
-                        ))}
-                    </MapView>
+                                    <View style={styles.popupRatingColumn}>
+                                        <Text style={styles.popupRatingLabel}>BusCafé</Text>
+                                        <Text style={styles.popupRatingValue}>
+                                            {selectedCafe.buscafeRating !== null
+                                                ? `★ ${selectedCafe.buscafeRating.toFixed(1)}`
+                                                : 'Sin puntuación'}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.popupChevron}>›</Text>
+                                </View>
+                            </TouchableOpacity>
+                            <View style={styles.popupTail} />
+                        </View>
+                    )}
+
                     <View
                         style={styles.mapControls}
                         pointerEvents="box-none"
                     >
-                        {showSearchAreaButton && !explorationLoading && (
-                            <View
-                                style={styles.searchAreaContainer}
-                                pointerEvents="box-none"
-                            >
-                                <TouchableOpacity
-                                    style={styles.searchAreaButton}
-                                    onPress={() =>
-                                    {
-                                        void searchInThisArea();
-                                    }}
-                                >
-                                    <Text style={styles.searchAreaButtonText}>
-                                        Buscar en esta zona
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
                         <TouchableOpacity
                             style={styles.recenterButton}
                             onPress={returnToMyLocation}
@@ -516,7 +613,24 @@ export default function MapScreen(
                             </Text>
                         </TouchableOpacity>
                     </View>
-
+                    {showSearchAreaButton && !explorationLoading && (
+                        <View
+                            style={styles.searchAreaContainer}
+                            pointerEvents="box-none"
+                        >
+                            <TouchableOpacity
+                                style={styles.searchAreaButton}
+                                onPress={() =>
+                                {
+                                    void searchInThisArea();
+                                }}
+                            >
+                                <Text style={styles.searchAreaButtonText}>
+                                    Buscar en esta zona
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                     {explorationLoading && (
                         <View style={styles.explorationStatus}>
                             <ActivityIndicator
@@ -694,6 +808,64 @@ const styles = StyleSheet.create({
 
     map: {
         flex: 1,
+    },
+
+    popupAnchor: {
+        position: 'absolute',
+        width: CARD_WIDTH,
+        alignItems: 'center',
+        zIndex: 10,
+        elevation: 10,
+    },
+    popupCard: {
+        width: CARD_WIDTH,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+        padding: 13,
+        elevation: 5,
+    },
+    popupTitleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    popupTitle: {
+        flex: 1,
+        fontWeight: '700',
+        fontSize: 16,
+        color: '#4A2416',
+    },
+    popupCoffee: { fontSize: 17, marginLeft: 8 },
+    popupAddress: { marginTop: 5, color: '#7A6254', fontSize: 12 },
+    popupDivider: {
+        height: 1,
+        backgroundColor: '#E8D9C7',
+        marginVertical: 10,
+    },
+    popupRatingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    popupRatingColumn: { flex: 1 },
+    popupRatingLabel: { fontSize: 11, color: '#7A6254' },
+    popupRatingValue: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4A2416',
+        marginTop: 3,
+    },
+    popupChevron: { fontSize: 26, color: '#7A6254' },
+    popupTail: {
+        width: 12,
+        height: 12,
+        backgroundColor: '#FFFFFF',
+        borderRightWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: '#E8D9C7',
+        transform: [{ rotate: '45deg' }],
+        marginTop: -7,
     },
 
     selectedCafeName: {

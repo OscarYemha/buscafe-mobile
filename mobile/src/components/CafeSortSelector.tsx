@@ -30,7 +30,7 @@ export default function CafeSortSelector({ value, onChange }: Props)
     return (
         <View style={styles.container}>
             <View style={styles.row}>
-                <Text style={styles.label}>Ordenar por</Text>
+                <Text style={styles.label}>Ordenar por:</Text>
 
                     <TouchableOpacity
                         style={styles.trigger}
@@ -73,13 +73,15 @@ export default function CafeSortSelector({ value, onChange }: Props)
                                     {option.label}
                                 </Text>
 
-                                {value === option.value && (
-                                    <Ionicons
-                                        name="checkmark"
-                                        size={18}
-                                        color="#6B3A22"
-                                    />
-                                )}
+                                <View style={{ width: 20, alignItems: 'center' }}>
+                                    {value === option.value && (
+                                        <Ionicons
+                                            name="checkmark"
+                                            size={18}
+                                            color="#6B3A22"
+                                        />
+                                    )}
+                                </View>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -95,14 +97,13 @@ const styles = StyleSheet.create({
     },
 
     label: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
         color: '#7A6254',
     },
 
     trigger: {
-        minWidth: 155,
-        maxWidth: '65%',
+        width: 240,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: '100%',
         right: 0,
-        width: 180,
+        width: 200,
         marginTop: 4,
         borderRadius: 12,
         borderWidth: 1,
@@ -139,12 +140,14 @@ const styles = StyleSheet.create({
     option: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         paddingHorizontal: 14,
         paddingVertical: 13,
+        gap: 8,
     },
 
     optionText: {
+        flex: 1,
+        flexShrink: 1,
         fontSize: 14,
         color: '#6B3A22',
     },

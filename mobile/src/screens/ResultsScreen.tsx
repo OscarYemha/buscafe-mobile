@@ -129,7 +129,10 @@ export default function ResultsScreen({ route, navigation }: Props)
     {
         if (!isAuthenticated)
         {
-            navigation.navigate('Login');
+            navigation.navigate('Login', {
+                returnTo: 'previous',
+            });
+
             return;
         }
 

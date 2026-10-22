@@ -15,3 +15,6 @@ dist/
 # Sistema operativo
 .DS_Store
 server/src/generated/prisma/
+
+# Copias de seguridad locales
+/backups/

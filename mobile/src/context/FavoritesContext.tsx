@@ -134,6 +134,7 @@ export function FavoritesProvider({
     const cacheWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
     const cacheReadyRef = useRef(false);
     const isOnlineRef = useRef<boolean | null>(null);
+    const needsReconciliationRef = useRef(false);
     const refreshFavoritesRef = useRef<() => Promise<void>>(
         async () => {}
     );
@@ -216,6 +217,7 @@ export function FavoritesProvider({
             )
             {
                 updateFavorites(result);
+                needsReconciliationRef.current = false;
 
                 await persistFavorites(
                     requestedUserId,
@@ -246,6 +248,7 @@ export function FavoritesProvider({
         const currentUserId = user?.id;
 
         cacheReadyRef.current = false;
+        needsReconciliationRef.current = false;
         updateFavorites([]);
         setIsLoadingFavorites(false);
 
@@ -292,7 +295,7 @@ export function FavoritesProvider({
         const unsubscribe = NetInfo.addEventListener(state => {
             const isOnline =
                 state.isConnected === true &&
-                state.isInternetReachable !== false;
+                state.isInternetReachable === true;
 
             isOnlineRef.current = isOnline;
 
@@ -303,6 +306,8 @@ export function FavoritesProvider({
                     cacheReadyRef.current
                 )
                 {
+                    // Solo marcamos la reconciliación como terminada
+                    // cuando la lectura del servidor se haya completado.
                     void refreshFavoritesRef.current();
                 }
             }
@@ -328,11 +333,21 @@ export function FavoritesProvider({
     const checkConnection = async (): Promise<boolean> => {
         try
         {
-            const state = await NetInfo.fetch();
+            let state = await NetInfo.fetch();
+
+            // Si todavía no se evaluó el acceso real a Internet,
+            // pedimos una comprobación adicional antes de permitir cambios.
+            if (
+                state.isConnected === true &&
+                state.isInternetReachable === null
+            )
+            {
+                state = await NetInfo.refresh();
+            }
 
             const isOnline =
                 state.isConnected === true &&
-                state.isInternetReachable !== false;
+                state.isInternetReachable === true;
 
             isOnlineRef.current = isOnline;
 
@@ -340,7 +355,7 @@ export function FavoritesProvider({
             {
                 Alert.alert(
                     'Sin conexión',
-                    'Necesitás conexión a Internet para modificar tus favoritos. Intentá nuevamente cuando tengas conexión.'
+                    'Para modificar tus favoritos necesitamos confirmar la conexión a Internet. No se realizó ningún cambio.'
                 );
             }
 
@@ -421,14 +436,32 @@ export function FavoritesProvider({
                     error
                 );
 
+                // Una solicitud puede haberse aplicado en el servidor
+                // aunque el teléfono no haya recibido su respuesta.
+                // No cambiamos la caché basándonos en ese error.
+                needsReconciliationRef.current = true;
+
                 Alert.alert(
-                    'No se pudo modificar favoritos',
-                    'No pudimos guardar el cambio. Comprobá tu conexión e intentá nuevamente.'
+                    'No se pudo confirmar el cambio',
+                    'Puede que el servidor haya recibido la solicitud. Conservamos tus favoritos locales y volveremos a sincronizarlos cuando sea posible.'
                 );
             }
             finally
             {
                 pendingMutationsRef.current.delete(googlePlaceId);
+
+                // Las lecturas iniciadas durante una mutación se descartan.
+                // Al terminar, volvemos a consultar el servidor si hubo
+                // una respuesta incierta y todavía hay conexión.
+                if (
+                    needsReconciliationRef.current &&
+                    pendingMutationsRef.current.size === 0 &&
+                    isCurrentUser(requestedUserId) &&
+                    isOnlineRef.current === true
+                )
+                {
+                    void refreshFavoritesRef.current();
+                }
             }
         };
 

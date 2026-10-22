@@ -244,7 +244,10 @@ export default function SearchScreen(
     {
         if (!isAuthenticated)
         {
-            navigation.navigate('Login');
+            navigation.navigate('Login', {
+                returnTo: 'previous',
+            });
+
             return;
         }
 
