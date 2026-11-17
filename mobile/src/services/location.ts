@@ -22,10 +22,7 @@ export async function getCurrentLocation():
   let permission =
     await Location.getForegroundPermissionsAsync();
 
-  if (
-    permission.status !== 'granted' &&
-    permission.canAskAgain
-  )
+  if (permission.status !== 'granted')
   {
     permission =
       await Location.requestForegroundPermissionsAsync();
@@ -58,6 +55,24 @@ export async function watchUserLocation(
   onLocationChange: (location: UserLocation) => void
 ): Promise<Location.LocationSubscription>
 {
+  const permission =
+    await Location.getForegroundPermissionsAsync();
+
+  if (permission.status !== 'granted') {
+    throw new Error(
+      `Seguimiento GPS sin permiso. Estado: ${permission.status}`
+    );
+  }
+
+  const servicesEnabled =
+    await Location.hasServicesEnabledAsync();
+
+  if (!servicesEnabled) {
+    throw new Error(
+      'Los servicios de ubicación de Android están desactivados'
+    );
+  }
+
   return Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.High,

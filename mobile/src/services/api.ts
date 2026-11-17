@@ -2,6 +2,8 @@ import { CafeSummary } from "../types/CafeSummary";
 import { CafeDetail } from "../types/CafeDetail";
 import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system/legacy';
+import { File } from 'expo-file-system';
+import { fetch as expoFetch } from 'expo/fetch';
 
 const API_URL =
     process.env.EXPO_PUBLIC_API_URL ??
@@ -782,17 +784,16 @@ export async function updateProfileWithAvatar(
                     ? 'image/webp'
                     : 'image/jpeg';
 
+        const file = new File(imageUri);
+
         formData.append(
             'avatar',
-            {
-                uri: imageUri,
-                name: fileName,
-                type: mimeType
-            } as any
+            file,
+            fileName
         );
     }
 
-    const response = await fetch(
+    const response = await expoFetch(
         `${API_URL}/users/me/profile`,
         {
             method: 'PATCH',

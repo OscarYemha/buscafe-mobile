@@ -4,8 +4,13 @@ type RankableCafe = {
     goodForWorkPercentage: number | null;
     goodForStudyPercentage: number | null;
     goodForDatePercentage: number | null;
+    goodForWorkResponsesCount?: number;
+    goodForStudyResponsesCount?: number;
+    goodForDateResponsesCount?: number;
     coffeeRating: number | null;
     foodRating: number | null;
+    coffeeRatingsCount?: number;
+    foodRatingsCount?: number;
     allowsDogs: boolean | null;
 };
 
@@ -32,6 +37,22 @@ function getRecommendationPercentage(
     }
 }
 
+function getRecommendationResponsesCount(
+    cafe: RankableCafe,
+    intent: RecommendationIntent
+): number {
+    switch (intent) {
+        case 'work':
+            return cafe.goodForWorkResponsesCount ?? 0;
+
+        case 'study':
+            return cafe.goodForStudyResponsesCount ?? 0;
+
+        case 'date':
+            return cafe.goodForDateResponsesCount ?? 0;
+    }
+}
+
 export function filterCafesByRecommendation<
     T extends RankableCafe
 >(
@@ -49,7 +70,9 @@ export function filterCafesByRecommendation<
 
             return (
                 percentage !== null &&
-                percentage > 50
+                Number.isFinite(percentage) &&
+                percentage >= 70 &&
+                getRecommendationResponsesCount(cafe, intent) >= 5
             );
         })
         .sort((a, b) => {
@@ -86,6 +109,19 @@ function getIntentRating(
     }
 }
 
+function getIntentRatingsCount(
+    cafe: RankableCafe,
+    intent: RatingIntent
+): number {
+    switch (intent) {
+        case 'coffee':
+            return cafe.coffeeRatingsCount ?? 0;
+
+        case 'food':
+            return cafe.foodRatingsCount ?? 0;
+    }
+}
+
 export function filterCafesByRating<
     T extends RankableCafe
 >(
@@ -103,7 +139,9 @@ export function filterCafesByRating<
 
             return (
                 rating !== null &&
-                rating >= 4
+                Number.isFinite(rating) &&
+                rating >= 4 &&
+                getIntentRatingsCount(cafe, intent) >= 5
             );
         })
         .sort((a, b) => {

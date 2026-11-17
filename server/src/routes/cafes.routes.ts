@@ -96,6 +96,21 @@ router.get('/nearby', async (req, res) => {
                         goodForDateCount:
                             stats.goodForDateCount,
 
+                        goodForWorkResponsesCount:
+                            stats.goodForWorkResponsesCount,
+
+                        goodForStudyResponsesCount:
+                            stats.goodForStudyResponsesCount,
+
+                        goodForDateResponsesCount:
+                            stats.goodForDateResponsesCount,
+
+                        coffeeRatingsCount:
+                            stats.coffeeRatingsCount,
+
+                        foodRatingsCount:
+                            stats.foodRatingsCount,
+
                     distanceKm: calculateDistanceKm(
                         latitude,
                         longitude,

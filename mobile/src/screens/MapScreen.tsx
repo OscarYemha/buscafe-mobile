@@ -106,6 +106,7 @@ export default function MapScreen(
     const isExploringMapRef = useRef(false);
     const explorationRequestIdRef = useRef(0);
     const currentRegionRef = useRef<Region | null>(null);
+    const searchReferenceRegionRef = useRef<Region | null>(null);
     const projectionEpochRef = useRef(0);
     const lastPopupUpdateRef = useRef(0);
     const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
@@ -149,6 +150,39 @@ export default function MapScreen(
 
         return a.distanceKm - b.distanceKm;
     });
+
+    function hasSignificantMapMovement(
+        reference: Region,
+        current: Region
+    ): boolean {
+        const latitudeMovement =
+            Math.abs(current.latitude - reference.latitude) /
+            reference.latitudeDelta;
+
+        const longitudeDifference =
+            Math.abs(current.longitude - reference.longitude);
+
+        const longitudeMovement =
+            Math.min(
+                longitudeDifference,
+                360 - longitudeDifference
+            ) / reference.longitudeDelta;
+
+        const zoomChange = Math.max(
+            Math.abs(
+                current.latitudeDelta / reference.latitudeDelta - 1
+            ),
+            Math.abs(
+                current.longitudeDelta / reference.longitudeDelta - 1
+            )
+        );
+
+        return (
+            latitudeMovement >= 0.15 ||
+            longitudeMovement >= 0.15 ||
+            zoomChange >= 0.20
+        );
+    }
 
     // Calculamos solo la posición de la cafetería seleccionada.
     // Al terminar el gesto, corregimos usando la proyección real de Google Maps.
@@ -254,6 +288,9 @@ export default function MapScreen(
 
             setExplorationCafes(nearbyCafes);
             setSelectedCafeId(null);
+            setPopupPoint(null);
+
+            searchReferenceRegionRef.current = exploredRegion;
 
             listRef.current?.scrollToOffset({
                 offset: 0,
@@ -308,6 +345,13 @@ export default function MapScreen(
             return;
         }
 
+        searchReferenceRegionRef.current = {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+        };
+
         programmaticMovementRef.current = true;
 
         mapRef.current.animateToRegion(
@@ -320,6 +364,29 @@ export default function MapScreen(
             350
         );
     }
+
+    const isPopupVisible =
+        selectedCafe !== null &&
+        popupPoint !== null &&
+        popupPoint.id === selectedCafe.googlePlaceId &&
+        popupHeight > 0 &&
+        popupPoint.x >= 0 &&
+        popupPoint.x <= mapSize.width &&
+        popupPoint.y <= mapSize.height &&
+        popupPoint.y - PIN_VERTICAL_OFFSET - popupHeight >= 12;
+
+    useEffect(() => {
+        if (!userLocation || searchReferenceRegionRef.current) {
+            return;
+        }
+
+        searchReferenceRegionRef.current = {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+        };
+    }, [userLocation]);
 
     return (
         <SafeAreaView
@@ -415,6 +482,7 @@ export default function MapScreen(
                         }}
                         showsUserLocation
                         showsMyLocationButton={false}
+                        toolbarEnabled={false}
                         onPress={(event) => {
                             if (event.nativeEvent.action === 'marker-press') {
                                 return;
@@ -460,13 +528,34 @@ export default function MapScreen(
 
                             if (details?.isGesture === true)
                             {
-                                isExploringMapRef.current = true;
+                                const reference = searchReferenceRegionRef.current;
 
-                                ++explorationRequestIdRef.current;
+                                if (!reference)
+                                {
+                                    searchReferenceRegionRef.current = region;
+                                    return;
+                                }
 
-                                setExplorationLoading(false);
-                                setExplorationError(null);
-                                setShowSearchAreaButton(true);
+                                const movedEnough =
+                                    hasSignificantMapMovement(reference, region);
+
+                                if (movedEnough)
+                                {
+                                    isExploringMapRef.current = true;
+
+                                    ++explorationRequestIdRef.current;
+
+                                    setExplorationLoading(false);
+                                    setExplorationError(null);
+
+                                    setSelectedCafeId(null);
+                                    setPopupPoint(null);
+                                    setShowSearchAreaButton(true);
+                                }
+                                else
+                                {
+                                    setShowSearchAreaButton(false);
+                                }
                             }
 
                         }}
@@ -538,14 +627,14 @@ export default function MapScreen(
                         popupPoint.x >= 0 && popupPoint.x <= mapSize.width &&
                         popupPoint.y >= 0 && popupPoint.y <= mapSize.height && (
                         <View
-                            pointerEvents="box-none"
+                            pointerEvents={isPopupVisible ? 'box-none' : 'none'}
                             style={[
                                 styles.popupAnchor,
                                 {
                                     left: popupPoint.x - CARD_WIDTH / 2,
                                     top: popupPoint.y - PIN_VERTICAL_OFFSET,
                                     transform: [{ translateY: -popupHeight }],
-                                    opacity: popupHeight ? 1 : 0,
+                                    opacity: isPopupVisible ? 1 : 0,
                                 },
                             ]}
                             onLayout={event => {

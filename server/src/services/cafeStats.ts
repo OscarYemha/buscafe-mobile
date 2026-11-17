@@ -40,6 +40,13 @@ export type CafeStats = {
     goodForStudyCount: number;
     goodForDateCount: number;
 
+    goodForWorkResponsesCount: number;
+    goodForStudyResponsesCount: number;
+    goodForDateResponsesCount: number;
+
+    coffeeRatingsCount: number;
+    foodRatingsCount: number;
+
     reviews: CafeReview[];
 };
 
@@ -101,6 +108,13 @@ export async function getCafeStats(
             goodForWorkCount: 0,
             goodForStudyCount: 0,
             goodForDateCount: 0,
+
+            goodForWorkResponsesCount: 0,
+            goodForStudyResponsesCount: 0,
+            goodForDateResponsesCount: 0,
+
+            coffeeRatingsCount: 0,
+            foodRatingsCount: 0,
 
             reviews: [],
         };
@@ -229,6 +243,31 @@ export async function getCafeStats(
         goodForDateCount:
             cafe.reviews.filter(
                 review => review.goodForDate === true
+            ).length,
+
+        goodForWorkResponsesCount:
+            cafe.reviews.filter(
+                review => review.goodForWork !== null
+            ).length,
+
+        goodForStudyResponsesCount:
+            cafe.reviews.filter(
+                review => review.goodForStudy !== null
+            ).length,
+
+        goodForDateResponsesCount:
+            cafe.reviews.filter(
+                review => review.goodForDate !== null
+            ).length,
+
+        coffeeRatingsCount:
+            cafe.reviews.filter(
+                review => review.coffeeRating !== null
+            ).length,
+
+        foodRatingsCount:
+            cafe.reviews.filter(
+                review => review.foodRating !== null
             ).length,
 
         reviews:

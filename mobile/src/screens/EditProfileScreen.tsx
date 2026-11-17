@@ -166,7 +166,7 @@ export default function EditProfileScreen()
 
             setTimeout(() => {
                 setEmailChangeSuccess(false);
-                navigation.popToTop();
+                navigation.navigate('AccountHome');
             }, 2000);
         }
         catch (error)
@@ -262,7 +262,7 @@ export default function EditProfileScreen()
 
                             setTimeout(() =>
                             {
-                                navigation.popToTop();
+                                navigation.navigate('AccountHome');
                             }, 2000);
                         }
                         catch (error)
