@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { Prisma } from '../generated/prisma/client.js';
 import prisma from '../lib/prisma.js';
 import {
     getPlaceDetails,
@@ -548,60 +547,6 @@ router.get('/:id', async (req, res) => {
 
         return res.status(500).json({
             error: 'No se pudo obtener la cafetería',
-        });
-    }
-});
-
-router.post('/', async (req, res) => {
-    try {
-        const {
-            googlePlaceId,
-            name,
-            address,
-            latitude,
-            longitude,
-        } = req.body;
-
-        if (
-            typeof googlePlaceId !== 'string' ||
-            googlePlaceId.trim() === '' ||
-            typeof name !== 'string' ||
-            name.trim() === '' ||
-            typeof address !== 'string' ||
-            address.trim() === '' ||
-            typeof latitude !== 'number' ||
-            typeof longitude !== 'number'
-        ) {
-            return res.status(400).json({
-                error: 'Los datos de la cafetería son inválidos',
-            });
-        }
-
-        const cafe = await prisma.cafe.create({
-            data: {
-                googlePlaceId,
-                name,
-                address,
-                latitude,
-                longitude,
-            },
-        });
-
-        return res.status(201).json(cafe);
-    } catch (error) {
-        if (
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2002'
-        ) {
-            return res.status(409).json({
-                error: 'La cafetería ya existe',
-            });
-        }
-
-        console.error(error);
-
-        return res.status(500).json({
-            error: 'No se pudo crear la cafetería',
         });
     }
 });
