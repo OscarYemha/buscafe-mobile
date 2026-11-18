@@ -18,15 +18,18 @@ model User {
   email                    String    @unique
   passwordHash             String
   createdAt                DateTime  @default(now())
-  emailVerified            Boolean   @default(false)
-  emailVerificationCode    String?
-  emailVerificationExpires DateTime?
-  pendingEmail             String?
-  emailChangeCode          String?
-  emailChangeCodeExpires   DateTime?
-  avatarUrl                String?
-  passwordResetCode        String?
-  passwordResetCodeExpires DateTime?
+  emailVerified             Boolean   @default(false)
+  emailVerificationCodeHash String?
+  emailVerificationExpires  DateTime?
+  emailVerificationAttempts Int       @default(0)
+  pendingEmail              String?
+  emailChangeCodeHash       String?
+  emailChangeCodeExpires    DateTime?
+  emailChangeAttempts       Int       @default(0)
+  avatarUrl                 String?
+  passwordResetCodeHash     String?
+  passwordResetCodeExpires  DateTime?
+  passwordResetAttempts     Int       @default(0)
 
   reviews   Review[]
   favorites Favorite[]

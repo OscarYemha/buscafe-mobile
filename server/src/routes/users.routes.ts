@@ -12,7 +12,11 @@ import {
     sendPasswordResetEmail,
     sendVerificationEmail
 } from '../services/email.js';
-import { randomInt } from 'node:crypto';
+import {
+    consumeVerificationCode,
+    issueVerificationCode,
+    TOO_MANY_ATTEMPTS_MESSAGE,
+} from '../services/verificationCodes.js';
 import multer from 'multer';
 import { supabase } from '../lib/supabase.js';
 import { randomUUID } from 'node:crypto';
@@ -479,30 +483,14 @@ router.post(
             }
 
             const code =
-                randomInt(
-                    100000,
-                    1000000
-                ).toString();
-
-            const expiresAt =
-                new Date(
-                    Date.now() +
-                    15 * 60 * 1000
+                await issueVerificationCode(
+                    'email-change',
+                    userId,
+                    {
+                        pendingEmail:
+                            normalizedEmail,
+                    }
                 );
-
-            await prisma.user.update({
-                where: {
-                    id: userId,
-                },
-                data: {
-                    pendingEmail:
-                        normalizedEmail,
-                    emailChangeCode:
-                        code,
-                    emailChangeCodeExpires:
-                        expiresAt,
-                },
-            });
 
             await sendEmailChangeVerification(
                 normalizedEmail,
@@ -563,42 +551,14 @@ router.post(
                     },
                     select: {
                         pendingEmail: true,
-                        emailChangeCode: true,
-                        emailChangeCodeExpires: true,
                     },
                 });
 
-            if (
-                !user ||
-                !user.pendingEmail ||
-                !user.emailChangeCode ||
-                !user.emailChangeCodeExpires
-            )
+            if (!user || !user.pendingEmail)
             {
                 return res.status(400).json({
                     error:
                         'No hay un cambio de email pendiente',
-                });
-            }
-
-            if (
-                user.emailChangeCodeExpires <
-                new Date()
-            )
-            {
-                return res.status(400).json({
-                    error:
-                        'El código de verificación venció',
-                });
-            }
-
-            if (
-                user.emailChangeCode !== code
-            )
-            {
-                return res.status(400).json({
-                    error:
-                        'El código de verificación es incorrecto',
                 });
             }
 
@@ -623,18 +583,48 @@ router.post(
                 });
             }
 
+            const result =
+                await consumeVerificationCode(
+                    'email-change',
+                    userId,
+                    code,
+                    (pendingEmail) => ({
+                        ...(pendingEmail
+                            ? { email: pendingEmail }
+                            : {}),
+                        pendingEmail: null,
+                    })
+                );
+
+            switch (result.status)
+            {
+                case 'ok':
+                    break;
+                case 'locked':
+                    return res.status(429).json({
+                        error: TOO_MANY_ATTEMPTS_MESSAGE,
+                    });
+                case 'expired':
+                    return res.status(400).json({
+                        error:
+                            'El código de verificación venció',
+                    });
+                case 'invalid':
+                    return res.status(400).json({
+                        error:
+                            'El código de verificación es incorrecto',
+                    });
+                case 'missing':
+                    return res.status(400).json({
+                        error:
+                            'No hay un cambio de email pendiente',
+                    });
+            }
+
             const updatedUser =
-                await prisma.user.update({
+                await prisma.user.findUnique({
                     where: {
                         id: userId,
-                    },
-                    data: {
-                        email:
-                            user.pendingEmail,
-                        pendingEmail: null,
-                        emailChangeCode: null,
-                        emailChangeCodeExpires:
-                            null,
                     },
                     select: {
                         id: true,
@@ -648,6 +638,17 @@ router.post(
         }
         catch (error)
         {
+            if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2002'
+            )
+            {
+                return res.status(409).json({
+                    error:
+                        'Ese email ya está asociado a otra cuenta',
+                });
+            }
+
             console.error(error);
 
             return res.status(500).json({
@@ -940,24 +941,11 @@ router.post('/', async (req, res) => {
 
         const passwordHash = await bcrypt.hash(password, 10);
 
-        const verificationCode =
-            randomInt(
-                100000,
-                1000000
-            ).toString();
-
-        const verificationExpires =
-            new Date(
-                Date.now() + 15 * 60 * 1000
-            );
-
         const user = await prisma.user.create({
             data: {
                 name: name.trim(),
                 email: email.trim().toLowerCase(),
                 passwordHash,
-                emailVerificationCode: verificationCode,
-                emailVerificationExpires: verificationExpires,
             },
             select: {
                 id: true,
@@ -969,6 +957,16 @@ router.post('/', async (req, res) => {
 
         try
         {
+            /*
+             * El hash del código incluye el id del usuario,
+             * así que se emite después de crearlo.
+             */
+            const verificationCode =
+                await issueVerificationCode(
+                    'email-verification',
+                    user.id
+                );
+
             await sendVerificationEmail(
                 user.email,
                 verificationCode
@@ -1054,27 +1052,10 @@ router.post('/resend-verification', async (req, res) => {
         }
 
         const verificationCode =
-            randomInt(
-                100000,
-                1000000
-            ).toString();
-
-        const verificationExpires =
-            new Date(
-                Date.now() + 15 * 60 * 1000
+            await issueVerificationCode(
+                'email-verification',
+                user.id
             );
-
-        await prisma.user.update({
-            where: {
-                id: user.id,
-            },
-            data: {
-                emailVerificationCode:
-                    verificationCode,
-                emailVerificationExpires:
-                    verificationExpires,
-            },
-        });
 
         await sendVerificationEmail(
             user.email,
@@ -1132,33 +1113,35 @@ router.post('/verify-email', async (req, res) => {
             });
         }
 
-        if (
-            user.emailVerificationCode !== code ||
-            !user.emailVerificationExpires ||
-            user.emailVerificationExpires < new Date()
-        )
+        const result =
+            await consumeVerificationCode(
+                'email-verification',
+                user.id,
+                code,
+                () => ({
+                    emailVerified: true,
+                })
+            );
+
+        if (result.status === 'locked')
+        {
+            return res.status(429).json({
+                error: TOO_MANY_ATTEMPTS_MESSAGE,
+            });
+        }
+
+        if (result.status !== 'ok')
         {
             return res.status(400).json({
                 error: 'El código de verificación es inválido o venció',
             });
         }
 
-        const verifiedUser =
-            await prisma.user.update({
-                where: {
-                    id: user.id,
-                },
-                data: {
-                    emailVerified: true,
-                    emailVerificationCode: null,
-                    emailVerificationExpires: null,
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                },
-            });
+        const verifiedUser = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+        };
 
         const jwtSecret =
             process.env.JWT_SECRET;
@@ -1236,27 +1219,10 @@ router.post(
             }
 
             const code =
-                randomInt(
-                    100000,
-                    1000000
-                ).toString();
-
-            const expiresAt =
-                new Date(
-                    Date.now() +
-                    15 * 60 * 1000
+                await issueVerificationCode(
+                    'password-reset',
+                    user.id
                 );
-
-            await prisma.user.update({
-                where: {
-                    id: user.id,
-                },
-                data: {
-                    passwordResetCode: code,
-                    passwordResetCodeExpires:
-                        expiresAt,
-                },
-            });
 
             await sendPasswordResetEmail(
                 user.email,
@@ -1317,11 +1283,7 @@ router.post(
                     },
                 });
 
-            if (
-                !user ||
-                !user.passwordResetCode ||
-                !user.passwordResetCodeExpires
-            )
+            if (!user)
             {
                 return res.status(400).json({
                     error:
@@ -1329,44 +1291,34 @@ router.post(
                 });
             }
 
-            if (
-                user.passwordResetCodeExpires <
-                new Date()
-            )
-            {
-                return res.status(400).json({
-                    error:
-                        'El código es inválido o venció',
-                });
-            }
-
-            if (
-                user.passwordResetCode !== code
-            )
-            {
-                return res.status(400).json({
-                    error:
-                        'El código es inválido o venció',
-                });
-            }
-
-            const passwordHash =
-                await bcrypt.hash(
-                    newPassword,
-                    10
+            const result =
+                await consumeVerificationCode(
+                    'password-reset',
+                    user.id,
+                    code,
+                    async () => ({
+                        passwordHash:
+                            await bcrypt.hash(
+                                newPassword,
+                                10
+                            ),
+                    })
                 );
 
-            await prisma.user.update({
-                where: {
-                    id: user.id,
-                },
-                data: {
-                    passwordHash,
-                    passwordResetCode: null,
-                    passwordResetCodeExpires:
-                        null,
-                },
-            });
+            if (result.status === 'locked')
+            {
+                return res.status(429).json({
+                    error: TOO_MANY_ATTEMPTS_MESSAGE,
+                });
+            }
+
+            if (result.status !== 'ok')
+            {
+                return res.status(400).json({
+                    error:
+                        'El código es inválido o venció',
+                });
+            }
 
             return res.json({
                 message:
