@@ -85,20 +85,33 @@ const byBodyEmail = (
         ...options,
     });
 
+/*
+ * En login solo cuentan los fallos. El 403 (email sin verificar)
+ * implica contraseña correcta, así que no cuenta como fallo.
+ * Por IP también: con CGNAT muchos usuarios móviles comparten IP y
+ * no queremos bloquear logins exitosos.
+ */
+const countOnlyLoginFailures: Partial<Options> = {
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (_req, res) =>
+        res.statusCode < 400 || res.statusCode === 403,
+};
+
 export const createAuthRateLimiters = () => ({
     loginByIp:
-        byIp('login-ip', 15 * MINUTE, 20, TOO_MANY_REQUESTS),
-
-    /*
-     * Solo cuentan los fallos. El 403 (email sin verificar) implica
-     * contraseña correcta, así que no cuenta como fallo.
-     */
-    loginByEmail:
-        byBodyEmail('login-email', 15 * MINUTE, 10, TOO_MANY_REQUESTS, {
-            skipSuccessfulRequests: true,
-            requestWasSuccessful: (_req, res) =>
-                res.statusCode < 400 || res.statusCode === 403,
+        limiter('login-ip', 15 * MINUTE, 20, TOO_MANY_REQUESTS, {
+            keyGenerator: (req) => ipKeyGenerator(req.ip ?? ''),
+            ...countOnlyLoginFailures,
         }),
+
+    loginByEmail:
+        byBodyEmail(
+            'login-email',
+            15 * MINUTE,
+            10,
+            TOO_MANY_REQUESTS,
+            countOnlyLoginFailures
+        ),
 
     registerByIp:
         byIp('register-ip', HOUR, 5, TOO_MANY_REQUESTS),
