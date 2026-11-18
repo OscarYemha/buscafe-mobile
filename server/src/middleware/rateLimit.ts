@@ -1,0 +1,139 @@
+import type { Request, Response } from 'express';
+import {
+    ipKeyGenerator,
+    rateLimit,
+    type Options,
+} from 'express-rate-limit';
+import type { AuthenticatedRequest } from './auth.js';
+
+/*
+ * Store en memoria: correcto con una sola instancia, pero los
+ * contadores se reinician en cada deploy o reinicio del servidor.
+ * Si se escala a varias instancias, hay que pasar a un store compartido.
+ */
+
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+const TOO_MANY_REQUESTS =
+    'Demasiados intentos. Probá de nuevo en unos minutos.';
+
+const TOO_MANY_CODES =
+    'Pediste demasiados códigos. Probá de nuevo más tarde.';
+
+const normalizeEmail = (value: unknown): string | null =>
+{
+    if (typeof value !== 'string')
+    {
+        return null;
+    }
+
+    const email = value.trim().toLowerCase();
+
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+};
+
+const bodyEmail = (req: Request): string | null =>
+    normalizeEmail(req.body?.email);
+
+const limiter = (
+    name: string,
+    windowMs: number,
+    limit: number,
+    message: string,
+    options: Partial<Options> = {}
+) =>
+    rateLimit({
+        windowMs,
+        limit,
+        identifier: name,
+        standardHeaders: 'draft-8',
+        legacyHeaders: false,
+        handler: (_req: Request, res: Response) =>
+        {
+            res.status(429).json({ error: message });
+        },
+        ...options,
+    });
+
+const byIp = (
+    name: string,
+    windowMs: number,
+    limit: number,
+    message: string
+) =>
+    limiter(name, windowMs, limit, message, {
+        keyGenerator: (req) => ipKeyGenerator(req.ip ?? ''),
+    });
+
+/*
+ * Si el email falta o es inválido no se aplica este límite: la ruta
+ * responde 400 igual y el límite por IP sigue activo. El límite se
+ * aplica exista o no la cuenta, así que el 429 no revela qué emails
+ * están registrados.
+ */
+const byBodyEmail = (
+    name: string,
+    windowMs: number,
+    limit: number,
+    message: string,
+    options: Partial<Options> = {}
+) =>
+    limiter(name, windowMs, limit, message, {
+        keyGenerator: (req) => `email:${bodyEmail(req)}`,
+        skip: (req) => bodyEmail(req) === null,
+        ...options,
+    });
+
+export const createAuthRateLimiters = () => ({
+    loginByIp:
+        byIp('login-ip', 15 * MINUTE, 20, TOO_MANY_REQUESTS),
+
+    /*
+     * Solo cuentan los fallos. El 403 (email sin verificar) implica
+     * contraseña correcta, así que no cuenta como fallo.
+     */
+    loginByEmail:
+        byBodyEmail('login-email', 15 * MINUTE, 10, TOO_MANY_REQUESTS, {
+            skipSuccessfulRequests: true,
+            requestWasSuccessful: (_req, res) =>
+                res.statusCode < 400 || res.statusCode === 403,
+        }),
+
+    registerByIp:
+        byIp('register-ip', HOUR, 5, TOO_MANY_REQUESTS),
+
+    passwordResetRequestByIp:
+        byIp('password-reset-request-ip', HOUR, 10, TOO_MANY_CODES),
+    passwordResetRequestByEmail:
+        byBodyEmail('password-reset-request-email', HOUR, 3, TOO_MANY_CODES),
+
+    resendVerificationByIp:
+        byIp('resend-verification-ip', HOUR, 10, TOO_MANY_CODES),
+    resendVerificationByEmail:
+        byBodyEmail('resend-verification-email', HOUR, 3, TOO_MANY_CODES),
+
+    // Requiere requireAuth antes, para tener req.userId.
+    emailChangeByIp:
+        byIp('email-change-ip', HOUR, 10, TOO_MANY_CODES),
+    emailChangeByUser:
+        limiter('email-change-user', HOUR, 3, TOO_MANY_CODES, {
+            keyGenerator: (req) =>
+                `user:${(req as AuthenticatedRequest).userId}`,
+            skip: (req) =>
+                (req as AuthenticatedRequest).userId === undefined,
+        }),
+    emailChangeByTargetEmail:
+        byBodyEmail('email-change-target-email', HOUR, 3, TOO_MANY_CODES),
+
+    // Segunda barrera sobre el límite de 5 intentos por código.
+    verifyEmailByIp:
+        byIp('verify-email-ip', 15 * MINUTE, 30, TOO_MANY_REQUESTS),
+    passwordResetConfirmByIp:
+        byIp('password-reset-confirm-ip', 15 * MINUTE, 30, TOO_MANY_REQUESTS),
+    emailChangeVerifyByIp:
+        byIp('email-change-verify-ip', 15 * MINUTE, 30, TOO_MANY_REQUESTS),
+});
+
+export type AuthRateLimiters =
+    ReturnType<typeof createAuthRateLimiters>;

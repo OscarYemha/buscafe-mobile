@@ -17,11 +17,13 @@ import {
     issueVerificationCode,
     TOO_MANY_ATTEMPTS_MESSAGE,
 } from '../services/verificationCodes.js';
+import { createAuthRateLimiters } from '../middleware/rateLimit.js';
 import multer from 'multer';
 import { supabase } from '../lib/supabase.js';
 import { randomUUID } from 'node:crypto';
 
 const router = Router();
+const limits = createAuthRateLimiters();
 
 const avatarUpload = multer({
     storage: multer.memoryStorage(),
@@ -406,7 +408,10 @@ router.delete(
 
 router.post(
     '/me/email-change',
+    limits.emailChangeByIp,
     requireAuth,
+    limits.emailChangeByUser,
+    limits.emailChangeByTargetEmail,
     async (
         req: AuthenticatedRequest,
         res
@@ -516,6 +521,7 @@ router.post(
 
 router.post(
     '/me/email-change/verify',
+    limits.emailChangeVerifyByIp,
     requireAuth,
     async (
         req: AuthenticatedRequest,
@@ -916,7 +922,7 @@ const isValidEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
-router.post('/', async (req, res) => {
+router.post('/', limits.registerByIp, async (req, res) => {
     try 
     {
         const {
@@ -1011,7 +1017,11 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.post('/resend-verification', async (req, res) => {
+router.post(
+    '/resend-verification',
+    limits.resendVerificationByIp,
+    limits.resendVerificationByEmail,
+    async (req, res) => {
     try
     {
         const {
@@ -1078,7 +1088,7 @@ router.post('/resend-verification', async (req, res) => {
     }
 });
 
-router.post('/verify-email', async (req, res) => {
+router.post('/verify-email', limits.verifyEmailByIp, async (req, res) => {
     try
     {
         const {
@@ -1179,6 +1189,8 @@ router.post('/verify-email', async (req, res) => {
 
 router.post(
     '/password-reset/request',
+    limits.passwordResetRequestByIp,
+    limits.passwordResetRequestByEmail,
     async (req, res) => {
         try
         {
@@ -1248,6 +1260,7 @@ router.post(
 
 router.post(
     '/password-reset/confirm',
+    limits.passwordResetConfirmByIp,
     async (req, res) => {
         try
         {
@@ -1337,7 +1350,11 @@ router.post(
     }
 );
 
-router.post('/login', async (req, res) => {
+router.post(
+    '/login',
+    limits.loginByIp,
+    limits.loginByEmail,
+    async (req, res) => {
     try
     {
         const {
