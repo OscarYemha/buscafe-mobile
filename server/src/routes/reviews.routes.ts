@@ -2,8 +2,18 @@ import { Router } from "express";
 import prisma from "../lib/prisma";
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth";
 import { Prisma } from '../generated/prisma/client';
+import {
+    CAFE_LOOKUP_FAILED_MESSAGE,
+    CAFE_NOT_FOUND_MESSAGE,
+    CafeLookupError,
+    CafeNotFoundError,
+    findOrCreateCafe,
+    isValidGooglePlaceId,
+} from '../services/cafes.js';
+import { createResourceRateLimiters } from '../middleware/rateLimit.js';
 
 const router = Router();
+const limits = createResourceRateLimiters();
 
 function isOptionalRating(value: unknown): boolean
 {
@@ -21,16 +31,17 @@ function isOptionalBoolean(value: unknown): boolean
         typeof value === 'boolean';
 }
 
-router.post('/', requireAuth, async (req: AuthenticatedRequest, res) =>
+router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedRequest, res) =>
 {
     try
     {
+        /*
+         * cafeName, cafeAddress, cafeLatitude y cafeLongitude se ignoran:
+         * la app vieja los sigue mandando, pero los datos del café salen
+         * de Google Places (ver findOrCreateCafe).
+         */
         const {
             googlePlaceId,
-            cafeName,
-            cafeAddress,
-            cafeLatitude,
-            cafeLongitude,
             rating,
             comment,
             coffeeRating,
@@ -49,15 +60,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) =>
 
         if (
             typeof googlePlaceId !== 'string' ||
-            googlePlaceId.trim() === '' ||
-            typeof cafeName !== 'string' ||
-            cafeName.trim() === '' ||
-            typeof cafeAddress !== 'string' ||
-            cafeAddress.trim() === '' ||
-            typeof cafeLatitude !== 'number' ||
-            !Number.isFinite(cafeLatitude) ||
-            typeof cafeLongitude !== 'number' ||
-            !Number.isFinite(cafeLongitude) ||
+            !isValidGooglePlaceId(googlePlaceId.trim()) ||
             !Number.isInteger(rating) ||
             rating < 1 ||
             rating > 5 ||
@@ -165,24 +168,32 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) =>
             return res.status(200).json(existing);
         }
 
-        const cafe = await prisma.cafe.upsert({
-            where: {
-                googlePlaceId: normalizedPlaceId,
-            },
-            update: {
-                name: cafeName.trim(),
-                address: cafeAddress.trim(),
-                latitude: cafeLatitude,
-                longitude: cafeLongitude,
-            },
-            create: {
-                googlePlaceId: normalizedPlaceId,
-                name: cafeName.trim(),
-                address: cafeAddress.trim(),
-                latitude: cafeLatitude,
-                longitude: cafeLongitude,
-            },
-        });
+        let cafe;
+
+        try
+        {
+            cafe = await findOrCreateCafe(normalizedPlaceId);
+        }
+        catch (error)
+        {
+            if (error instanceof CafeNotFoundError)
+            {
+                return res.status(404).json({
+                    error: CAFE_NOT_FOUND_MESSAGE,
+                });
+            }
+
+            if (error instanceof CafeLookupError)
+            {
+                console.error('Error al obtener la cafetería de Google:', error);
+
+                return res.status(502).json({
+                    error: CAFE_LOOKUP_FAILED_MESSAGE,
+                });
+            }
+
+            throw error;
+        }
 
         try
         {

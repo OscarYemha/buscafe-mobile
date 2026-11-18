@@ -1,8 +1,18 @@
 import { Router } from "express";
 import prisma from "../lib/prisma";
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth";
+import {
+    CAFE_LOOKUP_FAILED_MESSAGE,
+    CAFE_NOT_FOUND_MESSAGE,
+    CafeLookupError,
+    CafeNotFoundError,
+    findOrCreateCafe,
+    isValidGooglePlaceId,
+} from '../services/cafes.js';
+import { createResourceRateLimiters } from '../middleware/rateLimit.js';
 
 const router = Router();
+const limits = createResourceRateLimiters();
 
 router.get(
     '/',
@@ -53,28 +63,19 @@ router.get(
 router.post(
     '/',
     requireAuth,
+    limits.favoritesByUser,
     async (req: AuthenticatedRequest, res) => {
         try
         {
-            const {
-                googlePlaceId,
-                cafeName,
-                cafeAddress,
-                cafeLatitude,
-                cafeLongitude,
-            } = req.body;
+            /*
+             * cafeName, cafeAddress, cafeLatitude y cafeLongitude se
+             * ignoran: los datos del café salen de Google Places.
+             */
+            const { googlePlaceId } = req.body;
 
             if (
                 typeof googlePlaceId !== 'string' ||
-                googlePlaceId.trim() === '' ||
-                typeof cafeName !== 'string' ||
-                cafeName.trim() === '' ||
-                typeof cafeAddress !== 'string' ||
-                cafeAddress.trim() === '' ||
-                typeof cafeLatitude !== 'number' ||
-                !Number.isFinite(cafeLatitude) ||
-                typeof cafeLongitude !== 'number' ||
-                !Number.isFinite(cafeLongitude)
+                !isValidGooglePlaceId(googlePlaceId.trim())
             )
             {
                 return res.status(400).json({
@@ -91,24 +92,32 @@ router.post(
                 });
             }
 
-            const cafe = await prisma.cafe.upsert({
-                where: {
-                    googlePlaceId: googlePlaceId.trim(),
-                },
-                update: {
-                    name: cafeName.trim(),
-                    address: cafeAddress.trim(),
-                    latitude: cafeLatitude,
-                    longitude: cafeLongitude,
-                },
-                create: {
-                    googlePlaceId: googlePlaceId.trim(),
-                    name: cafeName.trim(),
-                    address: cafeAddress.trim(),
-                    latitude: cafeLatitude,
-                    longitude: cafeLongitude,
-                },
-            });
+            let cafe;
+
+            try
+            {
+                cafe = await findOrCreateCafe(googlePlaceId.trim());
+            }
+            catch (error)
+            {
+                if (error instanceof CafeNotFoundError)
+                {
+                    return res.status(404).json({
+                        error: CAFE_NOT_FOUND_MESSAGE,
+                    });
+                }
+
+                if (error instanceof CafeLookupError)
+                {
+                    console.error('Error al obtener la cafetería de Google:', error);
+
+                    return res.status(502).json({
+                        error: CAFE_LOOKUP_FAILED_MESSAGE,
+                    });
+                }
+
+                throw error;
+            }
 
             const favorite = await prisma.favorite.upsert({
                 where: {

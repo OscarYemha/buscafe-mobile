@@ -86,6 +86,23 @@ const byBodyEmail = (
     });
 
 /*
+ * Por usuario autenticado: va después de requireAuth. Sin userId
+ * (no debería pasar detrás de requireAuth) no se aplica.
+ */
+const byUser = (
+    name: string,
+    windowMs: number,
+    limit: number,
+    message: string
+) =>
+    limiter(name, windowMs, limit, message, {
+        keyGenerator: (req) =>
+            `user:${(req as AuthenticatedRequest).userId}`,
+        skip: (req) =>
+            (req as AuthenticatedRequest).userId === undefined,
+    });
+
+/*
  * En login solo cuentan los fallos. El 403 (email sin verificar)
  * implica contraseña correcta, así que no cuenta como fallo.
  * Por IP también: con CGNAT muchos usuarios móviles comparten IP y
@@ -130,12 +147,7 @@ export const createAuthRateLimiters = () => ({
     emailChangeByIp:
         byIp('email-change-ip', HOUR, 10, TOO_MANY_CODES),
     emailChangeByUser:
-        limiter('email-change-user', HOUR, 3, TOO_MANY_CODES, {
-            keyGenerator: (req) =>
-                `user:${(req as AuthenticatedRequest).userId}`,
-            skip: (req) =>
-                (req as AuthenticatedRequest).userId === undefined,
-        }),
+        byUser('email-change-user', HOUR, 3, TOO_MANY_CODES),
     emailChangeByTargetEmail:
         byBodyEmail('email-change-target-email', HOUR, 3, TOO_MANY_CODES),
 
@@ -150,3 +162,14 @@ export const createAuthRateLimiters = () => ({
 
 export type AuthRateLimiters =
     ReturnType<typeof createAuthRateLimiters>;
+
+/*
+ * Crear una reseña o un favorito de un café nuevo consulta Google
+ * Places: estos límites evitan que un usuario gaste llamadas en masa.
+ */
+export const createResourceRateLimiters = () => ({
+    reviewsByUser:
+        byUser('reviews-user', HOUR, 30, TOO_MANY_REQUESTS),
+    favoritesByUser:
+        byUser('favorites-user', HOUR, 60, TOO_MANY_REQUESTS),
+});
