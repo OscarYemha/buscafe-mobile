@@ -30,9 +30,6 @@ Nunca mergees a master sin que Oscar lo pida.
 - Deploy de fix/seguridad-auth (falta VERIFICATION_CODE_SECRET en
   Render, migración hash_verification_codes_and_attempts, después
   verificar y borrar GET /debug/ip).
-- Ubicación: watchUserLocation arranca antes de que se otorgue el
-  permiso (error "undetermined") y no se reintenta; getCurrentLocation
-  no verifica servicios de ubicación ni tiene timeout.
 - Resetear contraseña no invalida sesiones (tokenVersion).
 - 401 sin manejar en el resto de rutas de mobile (ej. removeFavorite).
 - Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
