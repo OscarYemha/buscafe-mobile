@@ -168,6 +168,11 @@ export async function createReview(
         }
     );
 
+    if (response.status === 401)
+    {
+        throw new InvalidSessionError();
+    }
+
     if (!response.ok)
     {
         throw await apiErrorFromResponse(
@@ -199,6 +204,19 @@ export class InvalidSessionError extends Error
 
         this.name = 'InvalidSessionError';
     }
+}
+
+export function isInvalidSessionError(
+    error: unknown
+): error is InvalidSessionError
+{
+    return (
+        error instanceof InvalidSessionError ||
+        (
+            error instanceof Error &&
+            error.name === 'InvalidSessionError'
+        )
+    );
 }
 
 export class EmailVerificationRequiredError extends Error
@@ -721,6 +739,11 @@ export async function addFavorite(
             body: JSON.stringify(data),
         }
     );
+
+    if (response.status === 401)
+    {
+        throw new InvalidSessionError();
+    }
 
     if (!response.ok)
     {

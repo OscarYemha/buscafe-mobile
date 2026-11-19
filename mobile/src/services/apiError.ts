@@ -45,11 +45,15 @@ export function isApiError(error: unknown): error is ApiError
  * POST /reviews y POST /favorites, el 502 viene de Google Places antes
  * de escribir nada). Un 500 u otro 5xx puede haber fallado después de
  * guardar, así que se trata como incierto.
+ *
+ * El 401 queda afuera: es sesión vencida y sigue ese flujo
+ * (InvalidSessionError), no se muestra como un error más.
  */
 export function isDefinitiveApiError(error: unknown): error is ApiError
 {
     return (
         isApiError(error) &&
+        error.status !== 401 &&
         (
             (error.status >= 400 && error.status < 500) ||
             error.status === 502
