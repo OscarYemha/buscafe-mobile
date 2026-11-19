@@ -5,17 +5,15 @@ import {
 } from 'express';
 
 import jwt from 'jsonwebtoken';
+import prisma from '../lib/prisma.js';
+import { getJwtSecret, type AuthTokenPayload } from '../lib/authToken.js';
 
 export type AuthenticatedRequest =
     Request & {
         userId?: number;
     };
 
-type JwtPayload = {
-    userId: number;
-};
-
-export function requireAuth(
+export async function requireAuth(
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
@@ -39,15 +37,7 @@ export function requireAuth(
             'Bearer '.length
         );
 
-    const jwtSecret =
-        process.env.JWT_SECRET;
-
-    if (!jwtSecret)
-    {
-        throw new Error(
-            'JWT_SECRET no está configurado'
-        );
-    }
+    const jwtSecret = getJwtSecret();
 
     try
     {
@@ -55,7 +45,7 @@ export function requireAuth(
             jwt.verify(
                 token,
                 jwtSecret
-            ) as JwtPayload;
+            ) as AuthTokenPayload;
 
         if (
             !Number.isInteger(payload.userId) ||
@@ -67,15 +57,36 @@ export function requireAuth(
             });
         }
 
+        const user =
+            await prisma.user.findUnique({
+                where: { id: payload.userId },
+                select: { tokenVersion: true },
+            });
+
+        const tokenVersion = 
+            payload.tokenVersion ?? 0;
+
+        if (!user || user.tokenVersion !== tokenVersion)
+        {
+            return res.status(401).json({
+                error: 'Sesión inválida o vencida',
+            });
+        }
+
         req.userId =
             payload.userId;
 
         next();
     }
-    catch
+    catch (error)
     {
-        return res.status(401).json({
-            error: 'Token inválido o vencido',
-        });
+        if (error instanceof jwt.JsonWebTokenError)
+        {
+            return res.status(401).json({
+                error: 'Token inválido o vencido',
+            });
+        }
+
+        throw error;
     }
 }

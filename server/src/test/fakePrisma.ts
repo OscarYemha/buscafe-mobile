@@ -175,6 +175,7 @@ export const db = {
         passwordResetCodeHash: null,
         passwordResetCodeExpires: null,
         passwordResetAttempts: 0,
+        tokenVersion: 0,
     })),
     cafes: new Table(['googlePlaceId'], () => ({})),
     reviews: new Table(['idempotencyKey'], () => ({
