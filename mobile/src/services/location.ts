@@ -14,6 +14,9 @@ export type LocationResult =
   | {
       status: 'denied';
       canAskAgain: boolean;
+    }
+  | {
+      status: 'services-disabled';
     };
 
 export async function getCurrentLocation():
@@ -34,6 +37,14 @@ export async function getCurrentLocation():
       status: 'denied',
       canAskAgain: permission.canAskAgain,
     };
+  }
+
+  const servicesEnabled =
+    await Location.hasServicesEnabledAsync();
+
+  if (!servicesEnabled)
+  {
+    return { status: 'services-disabled' };
   }
 
   const location =

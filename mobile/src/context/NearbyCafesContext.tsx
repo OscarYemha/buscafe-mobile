@@ -217,6 +217,19 @@ export function NearbyCafesProvider(
                     return;
                 }
 
+                if (result.status === 'services-disabled')
+                {
+                    setLocationPermissionGranted(false);
+                    setUserLocation(null);
+                    setCafes([]);
+
+                    setError(
+                        'La ubicación del teléfono está desactivada. Activala para ver las cafeterías cercanas.'
+                    );
+
+                    return;
+                }
+
                 const location = result.location;
 
                 setCanAskLocationAgain(true);
