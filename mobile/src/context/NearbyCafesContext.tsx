@@ -7,7 +7,7 @@ import {
     useRef,
     useState,
 } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { CafeSummary } from '../types/CafeSummary';
 import { getNearbyCafes } from '../services/api';
 import {
@@ -15,6 +15,7 @@ import {
     UserLocation,
     watchUserLocation,
 } from '../services/location';
+import * as Location from 'expo-location';
 
 const MOVEMENT_THRESHOLD_METERS = 50;
 const SIGNIFICANT_ACCURACY_IMPROVEMENT_METERS = 10;
@@ -28,6 +29,8 @@ type NearbyCafesContextValue = {
     canAskLocationAgain: boolean;
     refreshNearbyCafes: () => Promise<void>;
     markWaitingForLocationSettings: () => void;
+    locationServicesDisabled: boolean;
+    enableLocationServices: () => Promise<void>;
 };
 
 const NearbyCafesContext =
@@ -95,6 +98,8 @@ export function NearbyCafesProvider(
     const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
 
     const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
+
+    const [locationServicesDisabled, setLocationServicesDisabled] = useState(false);
 
     const selectedLocationRef = useRef<UserLocation | null>(null);
 
@@ -204,6 +209,7 @@ export function NearbyCafesProvider(
                 if (result.status === 'denied')
                 {
                     setLocationPermissionGranted(false);
+                    setLocationServicesDisabled(false);
                     setUserLocation(null);
                     setCafes([]);
                     setCanAskLocationAgain(result.canAskAgain);
@@ -222,6 +228,7 @@ export function NearbyCafesProvider(
                     setLocationPermissionGranted(false);
                     setUserLocation(null);
                     setCafes([]);
+                    setLocationServicesDisabled(true);
 
                     setError(
                         'La ubicación del teléfono está desactivada. Activala para ver las cafeterías cercanas.'
@@ -234,6 +241,7 @@ export function NearbyCafesProvider(
 
                 setCanAskLocationAgain(true);
                 setLocationPermissionGranted(true);
+                setLocationServicesDisabled(false);
 
                 selectedLocationRef.current = location;
                 movementCandidateRef.current = null;
@@ -309,6 +317,29 @@ export function NearbyCafesProvider(
             waitingForLocationSettings.current =
                 true;
         }, []);
+
+    const enableLocationServices =
+        useCallback(async () => {
+            if (Platform.OS !== 'android')
+            {
+                // iOS no permite activar la ubicación desde la app:
+                // reintentamos por si el usuario la prendió a mano.
+                await refreshNearbyCafes();
+                return;
+            }
+
+            try
+            {
+                await Location.enableNetworkProviderAsync();
+            }
+            catch
+            {
+                // El usuario canceló el diálogo: dejamos el mensaje como está.
+                return;
+            }
+
+            await refreshNearbyCafes();
+        }, [refreshNearbyCafes]);
 
     useEffect(() => {
         void refreshNearbyCafes();
@@ -505,6 +536,8 @@ export function NearbyCafesProvider(
                 canAskLocationAgain,
                 refreshNearbyCafes,
                 markWaitingForLocationSettings,
+                locationServicesDisabled,
+                enableLocationServices,
             }}
         >
             {children}

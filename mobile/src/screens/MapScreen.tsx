@@ -90,6 +90,8 @@ export default function MapScreen(
         canAskLocationAgain,
         refreshNearbyCafes,
         markWaitingForLocationSettings,
+        locationServicesDisabled,
+        enableLocationServices,
     } = useNearbyCafes();
 
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
@@ -426,7 +428,11 @@ export default function MapScreen(
                         <TouchableOpacity
                             style={styles.locationButton}
                             onPress={() => {
-                                if (canAskLocationAgain)
+                                if (locationServicesDisabled)
+                                {
+                                    void enableLocationServices();
+                                }
+                                else if (canAskLocationAgain)
                                 {
                                     void refreshNearbyCafes();
                                 }
@@ -442,9 +448,11 @@ export default function MapScreen(
                                     styles.locationButtonText
                                 }
                             >
-                                {canAskLocationAgain
-                                    ? '📍 Usar mi ubicación'
-                                    : '⚙️ Abrir ajustes'}
+                                {locationServicesDisabled
+                                    ? '📍 Activar ubicación'
+                                    : canAskLocationAgain
+                                        ? '📍 Usar mi ubicación'
+                                        : '⚙️ Abrir ajustes'}
                             </Text>
                         </TouchableOpacity>
                     </View>
