@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { createReview } from '../services/api';
 import { useReviews } from '../context/ReviewsContext';
 import { getErrorMessage } from '../utils/errorMessages';
+import { formatWaitTime, isApiError } from '../services/apiError';
 import { useState } from 'react';
 
 type Props = NativeStackScreenProps<
@@ -423,6 +424,58 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                                 'Error al publicar la reseña:',
                                 error
                             );
+
+                            if (
+                                isApiError(error) &&
+                                error.status === 429 &&
+                                error.retryAfterSeconds !== null
+                            )
+                            {
+                                Alert.alert(
+                                    'Límite de reseñas alcanzado',
+                                    `Publicaste muchas reseñas en poco tiempo. Podés volver a intentar en ${formatWaitTime(error.retryAfterSeconds)}. Tu borrador queda guardado.`
+                                );
+
+                                return;
+                            }
+
+                            if (
+                                isApiError(error) &&
+                                error.status === 404
+                            )
+                            {
+                                Alert.alert(
+                                    'Cafetería no disponible',
+                                    `${error.message}. No es posible publicar reseñas de este lugar. ¿Querés descartar el borrador?`,
+                                    [
+                                        {
+                                            text: 'Conservar',
+                                            style: 'cancel',
+                                        },
+                                        {
+                                            text: 'Descartar borrador',
+                                            style: 'destructive',
+                                            onPress: () =>
+                                            {
+                                                void clearDraft()
+                                                    .catch(clearError =>
+                                                    {
+                                                        console.error(
+                                                            'No se pudo descartar el borrador:',
+                                                            clearError
+                                                        );
+                                                    })
+                                                    .finally(() =>
+                                                    {
+                                                        navigation.goBack();
+                                                    });
+                                            },
+                                        },
+                                    ]
+                                );
+
+                                return;
+                            }
 
                             Alert.alert(
                                 'No se pudo publicar la reseña',

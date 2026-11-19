@@ -16,6 +16,7 @@ import {
     getFavorites,
     removeFavorite as removeFavoriteApi,
 } from '../services/api';
+import { isDefinitiveApiError } from '../services/apiError';
 import { CafeSummary } from '../types/CafeSummary';
 
 type FavoritesContextType = {
@@ -435,6 +436,18 @@ export function FavoritesProvider({
                     'ERROR MODIFICANDO FAVORITOS:',
                     error
                 );
+
+                // El servidor respondió que no aplicó el cambio (4xx o
+                // 502): no hay nada que reconciliar, mostramos su motivo.
+                if (isDefinitiveApiError(error))
+                {
+                    Alert.alert(
+                        'No se pudo actualizar tus favoritos',
+                        error.message
+                    );
+
+                    return;
+                }
 
                 // Una solicitud puede haberse aplicado en el servidor
                 // aunque el teléfono no haya recibido su respuesta.

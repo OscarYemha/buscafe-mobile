@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system/legacy';
 import { File } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
+import { apiErrorFromResponse } from './apiError';
 
 const API_URL =
     process.env.EXPO_PUBLIC_API_URL ??
@@ -169,12 +170,9 @@ export async function createReview(
 
     if (!response.ok)
     {
-        const result = await response.json().catch(() => null);
-
-        throw new Error(
-            typeof result?.error === 'string'
-                ? result.error
-                : 'No se pudo publicar la reseña'
+        throw await apiErrorFromResponse(
+            response,
+            'No se pudo publicar la reseña'
         );
     }
 
@@ -726,7 +724,10 @@ export async function addFavorite(
 
     if (!response.ok)
     {
-        throw new Error('No se pudo agregar a favoritos');
+        throw await apiErrorFromResponse(
+            response,
+            'No se pudo agregar a favoritos'
+        );
     }
     
     return response.json();
