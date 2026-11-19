@@ -2,7 +2,7 @@ import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { signAuthToken } from '../lib/authToken.js';
 import {
     AuthenticatedRequest,
     requireAuth
@@ -1153,24 +1153,7 @@ router.post('/verify-email', limits.verifyEmailByIp, async (req, res) => {
             email: user.email,
         };
 
-        const jwtSecret =
-            process.env.JWT_SECRET;
-
-        if (!jwtSecret)
-        {
-            throw new Error('JWT_SECRET no está configurado');
-        }
-
-        const token =
-            jwt.sign(
-                {
-                    userId: verifiedUser.id,
-                },
-                jwtSecret,
-                {
-                    expiresIn: '7d',
-                }
-            );
+        const token = signAuthToken(user);
 
         return res.json({
             token,
@@ -1407,23 +1390,7 @@ router.post(
             });
         }
 
-        const jwtSecret = process.env.JWT_SECRET;
-
-        if (!jwtSecret)
-        {
-            throw new Error('JWT_SECRET no está configurado');
-        }
-
-        const token = 
-            jwt.sign(
-                {
-                    userId: user.id,
-                },
-                jwtSecret,
-                {
-                    expiresIn: '7d',
-                }
-            );
+        const token = signAuthToken(user);
 
         return res.json({
             token,
