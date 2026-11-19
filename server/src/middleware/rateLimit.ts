@@ -169,7 +169,17 @@ export type AuthRateLimiters =
  */
 export const createResourceRateLimiters = () => ({
     reviewsByUser:
-        byUser('reviews-user', HOUR, 30, TOO_MANY_REQUESTS),
+        byUser(
+            'reviews-user',
+            HOUR,
+            30,
+            'Llegaste al límite de reseñas por hora. Probá de nuevo más tarde.'
+        ),
     favoritesByUser:
-        byUser('favorites-user', HOUR, 60, TOO_MANY_REQUESTS),
+        byUser(
+            'favorites-user',
+            HOUR,
+            60,
+            'Llegaste al límite de favoritos por hora. Probá de nuevo más tarde.'
+        ),
 });
