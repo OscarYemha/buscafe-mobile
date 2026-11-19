@@ -1,5 +1,23 @@
 import * as Location from 'expo-location';
 
+const LOCATION_TIMEOUT_MS = 10000;
+const LAST_KNOWN_MAX_AGE_MS = 10 * 60 * 1000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T>
+{
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Tiempo de espera agotado al obtener la ubicación')),
+      ms
+    );
+
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
 export type UserLocation = {
   latitude: number;
   longitude: number;
@@ -47,10 +65,28 @@ export async function getCurrentLocation():
     return { status: 'services-disabled' };
   }
 
-  const location =
-    await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
+  let location: Location.LocationObject | null;
+
+  try
+  {
+    location = await withTimeout(
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      }),
+      LOCATION_TIMEOUT_MS
+    );
+  }
+  catch (error)
+  {
+    location = await Location.getLastKnownPositionAsync({
+      maxAge: LAST_KNOWN_MAX_AGE_MS,
     });
+
+    if (!location)
+    {
+      throw error;
+    }
+  }
 
   return {
     status: 'granted',
