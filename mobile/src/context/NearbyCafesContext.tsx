@@ -94,6 +94,8 @@ export function NearbyCafesProvider(
 
     const [canAskLocationAgain, setCanAskLocationAgain] = useState(true);
 
+    const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
+
     const selectedLocationRef = useRef<UserLocation | null>(null);
 
     const movementCandidateRef = useRef<UserLocation | null>(null);
@@ -201,6 +203,7 @@ export function NearbyCafesProvider(
 
                 if (result.status === 'denied')
                 {
+                    setLocationPermissionGranted(false);
                     setUserLocation(null);
                     setCafes([]);
                     setCanAskLocationAgain(result.canAskAgain);
@@ -217,6 +220,7 @@ export function NearbyCafesProvider(
                 const location = result.location;
 
                 setCanAskLocationAgain(true);
+                setLocationPermissionGranted(true);
 
                 selectedLocationRef.current = location;
                 movementCandidateRef.current = null;
@@ -298,6 +302,11 @@ export function NearbyCafesProvider(
     }, [refreshNearbyCafes]);
 
     useEffect(() => {
+        if (!locationPermissionGranted)
+        {
+            return;
+        }
+
         let subscription:
             Awaited<
                 ReturnType<
@@ -442,7 +451,7 @@ export function NearbyCafesProvider(
             cancelled = true;
             subscription?.remove();
         };
-    }, [autoRefreshNearbyCafes]);
+    }, [autoRefreshNearbyCafes, locationPermissionGranted]);
 
     useEffect(() => {
         let previousAppState = AppState.currentState;
