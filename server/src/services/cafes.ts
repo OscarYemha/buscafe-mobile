@@ -38,6 +38,22 @@ export const CAFE_NOT_FOUND_MESSAGE =
 export const CAFE_LOOKUP_FAILED_MESSAGE =
     'No pudimos verificar la cafetería. Probá de nuevo.';
 
+/*
+ * Se loguea para que un problema de configuración (que haga parecer
+ * inexistentes a todos los lugares) se note en los logs.
+ */
+const cafeNotFound = (
+    googlePlaceId: string,
+    reason: string
+): CafeNotFoundError =>
+{
+    console.warn(
+        `findOrCreateCafe: cafetería no encontrada (${googlePlaceId}): ${reason}`
+    );
+
+    return new CafeNotFoundError(googlePlaceId);
+};
+
 /**
  * Devuelve el café guardado con ese googlePlaceId. Si no existe, lo
  * crea con los datos de Google Places, nunca con datos del cliente.
@@ -76,7 +92,7 @@ export const findOrCreateCafe = async (
     {
         if (error instanceof GooglePlaceNotFoundError)
         {
-            throw new CafeNotFoundError(googlePlaceId);
+            throw cafeNotFound(googlePlaceId, 'Google Places no lo encontró');
         }
 
         throw new CafeLookupError(googlePlaceId, error);
@@ -84,7 +100,7 @@ export const findOrCreateCafe = async (
 
     if (!summary)
     {
-        throw new CafeNotFoundError(googlePlaceId);
+        throw cafeNotFound(googlePlaceId, 'faltan nombre, dirección o ubicación');
     }
 
     try

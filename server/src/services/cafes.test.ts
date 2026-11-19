@@ -52,6 +52,7 @@ describe('findOrCreateCafe', () =>
     beforeEach(() =>
     {
         vi.resetAllMocks();
+        vi.restoreAllMocks();
         mocks.create.mockImplementation(async ({ data }) => ({
             id: 8,
             createdAt: new Date(),
@@ -103,8 +104,23 @@ describe('findOrCreateCafe', () =>
         mocks.findUnique.mockResolvedValue(null);
         mocks.getPlaceDetails.mockRejectedValue(new GooglePlaceNotFoundError('ChIJ_x'));
 
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
         await expect(findOrCreateCafe('ChIJ_x')).rejects.toBeInstanceOf(CafeNotFoundError);
         expect(mocks.create).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('ChIJ_x'));
+    });
+
+    it('un error de API key no se loguea como "no encontrado"', async () =>
+    {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mocks.findUnique.mockResolvedValue(null);
+        mocks.getPlaceDetails.mockRejectedValue(
+            new Error('Error de Google Place Details: 400 ... API_KEY_INVALID')
+        );
+
+        await expect(findOrCreateCafe('ChIJ_x')).rejects.toBeInstanceOf(CafeLookupError);
+        expect(warn).not.toHaveBeenCalled();
     });
 
     it('lanza CafeNotFoundError si al lugar le faltan datos', async () =>
@@ -112,6 +128,7 @@ describe('findOrCreateCafe', () =>
         mocks.findUnique.mockResolvedValue(null);
         const { location: _omitted, ...withoutLocation } = googlePlace();
         mocks.getPlaceDetails.mockResolvedValue(withoutLocation);
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         await expect(findOrCreateCafe('ChIJ_x')).rejects.toBeInstanceOf(CafeNotFoundError);
         expect(mocks.create).not.toHaveBeenCalled();
