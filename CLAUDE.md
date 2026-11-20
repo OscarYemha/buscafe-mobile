@@ -31,8 +31,8 @@ Nunca mergees a master sin que Oscar lo pida.
   Render, migraciones hash_verification_codes_and_attempts y
   add_user_token_version, después verificar y borrar GET /debug/ip).
   Deployar el server antes de buildear el APK: la app espera el token
-  nuevo que devuelve PATCH /users/me/password.
-- 401 sin manejar en el resto de rutas de mobile (ej. removeFavorite).
+  nuevo que devuelve PATCH /users/me/password, y que la contraseña
+  incorrecta sea 403 (con el server viejo, un 401 ahí la desloguea).
 - Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
   "Elegir zona", README desactualizado, npm audit en mobile.
 - Antes del APK: EXPO_PUBLIC_API_URL del environment preview de EAS
