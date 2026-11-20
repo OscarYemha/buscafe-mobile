@@ -15,9 +15,10 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamlist } from '../navigation/AppNavigator';
 import { useReviewDraft } from '../context/ReviewDraftContext';
 import { useAuth } from '../context/AuthContext';
-import { createReview } from '../services/api';
+import { createReview, isInvalidSessionError } from '../services/api';
 import { useReviews } from '../context/ReviewsContext';
 import { getErrorMessage } from '../utils/errorMessages';
+import { formatWaitTime, isApiError } from '../services/apiError';
 import { useState } from 'react';
 
 type Props = NativeStackScreenProps<
@@ -43,7 +44,7 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         preparePublication,
     } = useReviewDraft();
 
-    const {user, isAuthenticated} = useAuth();
+    const {user, isAuthenticated, logout} = useAuth();
     const { notifyReviewsChanged } = useReviews();
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -423,6 +424,93 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                                 'Error al publicar la reseña:',
                                 error
                             );
+
+                            // Sesión vencida: mismo flujo que al restaurar la
+                            // sesión. El borrador queda guardado para después.
+                            if (isInvalidSessionError(error))
+                            {
+                                try
+                                {
+                                    await logout();
+                                }
+                                catch (logoutError)
+                                {
+                                    console.error(
+                                        'Error al cerrar la sesión vencida:',
+                                        logoutError
+                                    );
+                                }
+
+                                Alert.alert(
+                                    'Sesión vencida',
+                                    `${error.message} Tu borrador queda guardado.`,
+                                    [
+                                        {
+                                            text: 'Iniciar sesión',
+                                            onPress: () =>
+                                            {
+                                                navigation.navigate('Login', {
+                                                    returnTo: 'previous',
+                                                });
+                                            },
+                                        },
+                                    ]
+                                );
+
+                                return;
+                            }
+
+                            if (
+                                isApiError(error) &&
+                                error.status === 429 &&
+                                error.retryAfterSeconds !== null
+                            )
+                            {
+                                Alert.alert(
+                                    'Límite de reseñas alcanzado',
+                                    `Publicaste muchas reseñas en poco tiempo. Podés volver a intentar en ${formatWaitTime(error.retryAfterSeconds)}. Tu borrador queda guardado.`
+                                );
+
+                                return;
+                            }
+
+                            if (
+                                isApiError(error) &&
+                                error.status === 404
+                            )
+                            {
+                                Alert.alert(
+                                    'Cafetería no disponible',
+                                    `${error.message}. No es posible publicar reseñas de este lugar. ¿Querés descartar el borrador?`,
+                                    [
+                                        {
+                                            text: 'Conservar',
+                                            style: 'cancel',
+                                        },
+                                        {
+                                            text: 'Descartar borrador',
+                                            style: 'destructive',
+                                            onPress: () =>
+                                            {
+                                                void clearDraft()
+                                                    .catch(clearError =>
+                                                    {
+                                                        console.error(
+                                                            'No se pudo descartar el borrador:',
+                                                            clearError
+                                                        );
+                                                    })
+                                                    .finally(() =>
+                                                    {
+                                                        navigation.goBack();
+                                                    });
+                                            },
+                                        },
+                                    ]
+                                );
+
+                                return;
+                            }
 
                             Alert.alert(
                                 'No se pudo publicar la reseña',

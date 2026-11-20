@@ -54,6 +54,8 @@ export default function HomeScreen({navigation}: Props) {
     canAskLocationAgain,
     refreshNearbyCafes,
     markWaitingForLocationSettings,
+    locationServicesDisabled,
+    enableLocationServices,
   } = useNearbyCafes();
 
   const {
@@ -229,7 +231,11 @@ export default function HomeScreen({navigation}: Props) {
               <TouchableOpacity
                 style={styles.locationButton}
                 onPress={() => {
-                  if (canAskLocationAgain)
+                  if (locationServicesDisabled)
+                  {
+                    void enableLocationServices();
+                  }
+                  else if (canAskLocationAgain)
                   {
                     void refreshNearbyCafes();
                   }
@@ -241,9 +247,11 @@ export default function HomeScreen({navigation}: Props) {
                 }}
               >
                 <Text style={styles.locationButtonText}>
-                  {canAskLocationAgain
-                    ? '📍 Usar mi ubicación'
-                    : '⚙️ Abrir ajustes'}
+                  {locationServicesDisabled
+                    ? '📍 Activar ubicación'
+                    : canAskLocationAgain
+                      ? '📍 Usar mi ubicación'
+                      : '⚙️ Abrir ajustes'}
                 </Text>
               </TouchableOpacity>
             </View>

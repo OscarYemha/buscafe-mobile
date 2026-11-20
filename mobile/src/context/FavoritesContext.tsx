@@ -14,8 +14,10 @@ import {
     addFavorite,
     Favorite,
     getFavorites,
+    isInvalidSessionError,
     removeFavorite as removeFavoriteApi,
 } from '../services/api';
+import { isDefinitiveApiError } from '../services/apiError';
 import { CafeSummary } from '../types/CafeSummary';
 
 type FavoritesContextType = {
@@ -118,7 +120,7 @@ export function FavoritesProvider({
     children: ReactNode;
 })
 {
-    const { isAuthenticated, user } = useAuth();
+    const { isAuthenticated, user, logout } = useAuth();
 
     const isAuthenticatedRef = useRef(isAuthenticated);
     isAuthenticatedRef.current = isAuthenticated;
@@ -435,6 +437,42 @@ export function FavoritesProvider({
                     'ERROR MODIFICANDO FAVORITOS:',
                     error
                 );
+
+                // Sesión vencida: mismo flujo que al restaurar la sesión
+                // (se borran las credenciales). El cambio no se aplicó.
+                if (isInvalidSessionError(error))
+                {
+                    try
+                    {
+                        await logout();
+                    }
+                    catch (logoutError)
+                    {
+                        console.error(
+                            'ERROR CERRANDO SESIÓN VENCIDA:',
+                            logoutError
+                        );
+                    }
+
+                    Alert.alert(
+                        'Sesión vencida',
+                        error.message
+                    );
+
+                    return;
+                }
+
+                // El servidor respondió que no aplicó el cambio (4xx o
+                // 502): no hay nada que reconciliar, mostramos su motivo.
+                if (isDefinitiveApiError(error))
+                {
+                    Alert.alert(
+                        'No se pudo actualizar tus favoritos',
+                        error.message
+                    );
+
+                    return;
+                }
 
                 // Una solicitud puede haberse aplicado en el servidor
                 // aunque el teléfono no haya recibido su respuesta.

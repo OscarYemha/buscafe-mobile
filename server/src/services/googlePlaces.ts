@@ -531,6 +531,13 @@ export async function searchCafes(
     };
 }
 
+export class GooglePlaceNotFoundError extends Error {
+    constructor(googlePlaceId: string) {
+        super(`Google Places no encontró el lugar ${googlePlaceId}`);
+        this.name = 'GooglePlaceNotFoundError';
+    }
+}
+
 export async function getPlaceDetails(
     googlePlaceId: string
 ): Promise<GooglePlace> {
@@ -611,6 +618,24 @@ export async function getPlaceDetails(
     if (!response.ok) {
         const errorBody =
             await response.text();
+
+        /*
+         * 404: el lugar no existe. 400 INVALID_ARGUMENT: el ID está mal
+         * formado, salvo que mencione la API key (API_KEY_INVALID usa el
+         * mismo status): eso es un problema de configuración. Cualquier
+         * otro error (key, cuota, caída de Google) sigue siendo un Error
+         * genérico.
+         */
+        if (
+            response.status === 404 ||
+            (
+                response.status === 400 &&
+                errorBody.includes('INVALID_ARGUMENT') &&
+                !errorBody.includes('API_KEY')
+            )
+        ) {
+            throw new GooglePlaceNotFoundError(googlePlaceId);
+        }
 
         throw new Error(
             `Error de Google Place Details: ` +
