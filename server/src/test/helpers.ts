@@ -7,15 +7,19 @@ export const TEST_CODE_SECRET = 'test-verification-code-secret';
 
 /*
  * Los rate limiters guardan estado durante todo el archivo de tests.
- * Cada request usa una IP propia (X-Forwarded-For, con trust proxy = 1)
- * salvo que el test quiera compartirla a propósito.
+ * Cada request usa una IP propia (X-Forwarded-For) salvo que el test
+ * quiera compartirla a propósito.
+ *
+ * Se usa 198.18.0.0/15 (reservado para pruebas, RFC 2544) y no una red
+ * privada como 10.x: esas son proxies de confianza (TRUSTED_PROXIES), y
+ * un cliente no debería parecerse a un proxy.
  */
 let ipCounter = 0;
 
 export const uniqueIp = (): string =>
 {
     ipCounter++;
-    return `10.${(ipCounter >> 16) & 255}.${(ipCounter >> 8) & 255}.${ipCounter & 255}`;
+    return `198.${18 + ((ipCounter >> 16) & 1)}.${(ipCounter >> 8) & 255}.${ipCounter & 255}`;
 };
 
 let emailCounter = 0;
