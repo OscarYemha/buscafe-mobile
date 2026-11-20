@@ -20,6 +20,7 @@ import {
     uploadAvatar,
     verifyEmail,
     requestEmailChange,
+    setInvalidSessionHandler,
     updateProfileWithAvatar,
     verifyEmailChange,
 } from "../services/api";
@@ -108,6 +109,28 @@ export function AuthProvider({children, }: {children: ReactNode})
 {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [isRestoringSession, setIsRestoringSession] = useState(true);
+
+    useEffect(() => {
+        setInvalidSessionHandler(async (rejectedToken) => {
+            const storedToken =
+                await SecureStore.getItemAsync(TOKEN_KEY);
+
+            // El 401 es de un request hecho con un token anterior:
+            // la sesión actual es otra y no hay que cerrarla.
+            if (storedToken !== rejectedToken)
+            {
+                return;
+            }
+
+            await clearStoredSession();
+
+            setUser(null);
+        });
+
+        return () => {
+            setInvalidSessionHandler(null);
+        };
+    }, []);
 
     useEffect(() => {
         const restoreSession = async () => {
