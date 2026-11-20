@@ -22,7 +22,7 @@ vi.mock('../lib/supabase.js', () => ({ supabase: {} }));
 vi.mock('../services/email.js', () => mail);
 
 import app from '../app.js';
-import { db } from './fakePrisma.js';
+import { db, fakePrisma } from './fakePrisma.js';
 import {
     createUser,
     lastCodeSent,
@@ -468,5 +468,133 @@ describe('POST /users/me/email-change y /verify', () =>
         expect((await authedPost('/users/me/email-change', forged, { email: uniqueEmail() })).status)
             .toBe(401);
         expect(tokenFor(user.id)).not.toBe(forged);
+    });
+});
+
+describe('tokenVersion: invalidación de sesiones', () =>
+{
+    const getMe = (token: string) =>
+        request(app)
+            .get('/users/me')
+            .set('X-Forwarded-For', uniqueIp())
+            .set('Authorization', `Bearer ${token}`);
+
+    const changePassword = (token: string, currentPassword: string, newPassword: string) =>
+        request(app)
+            .patch('/users/me/password')
+            .set('X-Forwarded-For', uniqueIp())
+            .set('Authorization', `Bearer ${token}`)
+            .send({ currentPassword, newPassword });
+
+    it('el login emite un token con la tokenVersion actual', async () =>
+    {
+        const user = await createUser();
+        userRow(user.id).tokenVersion = 3;
+
+        const res = await post('/users/login', { email: user.email, password: user.password });
+
+        expect(res.status).toBe(200);
+        expect(jwt.verify(res.body.token, TEST_JWT_SECRET)).toMatchObject({
+            userId: user.id,
+            tokenVersion: 3,
+        });
+        expect((await getMe(res.body.token)).status).toBe(200);
+    });
+
+    it('acepta tokens viejos sin tokenVersion mientras la versión sea 0', async () =>
+    {
+        const user = await createUser();
+        // tokenFor firma solo { userId }, como los tokens previos a tokenVersion.
+        expect(jwt.decode(user.token)).not.toHaveProperty('tokenVersion');
+
+        expect((await getMe(user.token)).status).toBe(200);
+    });
+
+    it('resetear la contraseña invalida los tokens anteriores', async () =>
+    {
+        const user = await createUser();
+        expect((await getMe(user.token)).status).toBe(200);
+
+        await post('/users/password-reset/request', { email: user.email });
+        const code = lastCodeSent(mail.sendPasswordResetEmail, user.email);
+        const confirm = await post('/users/password-reset/confirm', {
+            email: user.email,
+            code,
+            newPassword: 'nueva-contraseña',
+        });
+        expect(confirm.status).toBe(200);
+        expect(userRow(user.id).tokenVersion).toBe(1);
+
+        expect((await getMe(user.token)).status).toBe(401);
+
+        const login = await post('/users/login', { email: user.email, password: 'nueva-contraseña' });
+        expect((await getMe(login.body.token)).status).toBe(200);
+    });
+
+    it('un reset fallido no invalida las sesiones', async () =>
+    {
+        const user = await createUser();
+        await post('/users/password-reset/request', { email: user.email });
+        const code = lastCodeSent(mail.sendPasswordResetEmail, user.email);
+
+        const confirm = await post('/users/password-reset/confirm', {
+            email: user.email,
+            code: otherCode(code),
+            newPassword: 'nueva-contraseña',
+        });
+        expect(confirm.status).toBe(400);
+
+        expect(userRow(user.id).tokenVersion).toBe(0);
+        expect((await getMe(user.token)).status).toBe(200);
+    });
+
+    it('cambiar la contraseña invalida los otros tokens y devuelve uno nuevo válido', async () =>
+    {
+        const user = await createUser();
+        const otherDevice = tokenFor(user.id);
+
+        const res = await changePassword(user.token, user.password, 'nueva-contraseña');
+
+        expect(res.status).toBe(200);
+        expect(res.body.token).toBeTypeOf('string');
+        expect(jwt.verify(res.body.token, TEST_JWT_SECRET)).toMatchObject({
+            userId: user.id,
+            tokenVersion: 1,
+        });
+
+        expect((await getMe(user.token)).status).toBe(401);
+        expect((await getMe(otherDevice)).status).toBe(401);
+        expect((await getMe(res.body.token)).status).toBe(200);
+    });
+
+    it('cambiar la contraseña con la actual incorrecta no invalida nada', async () =>
+    {
+        const user = await createUser();
+
+        const res = await changePassword(user.token, 'incorrecta', 'nueva-contraseña');
+
+        expect(res.status).toBe(401);
+        expect(res.body.token).toBeUndefined();
+        expect(userRow(user.id).tokenVersion).toBe(0);
+        expect((await getMe(user.token)).status).toBe(200);
+    });
+
+    it('rechaza el token de un usuario que ya no existe', async () =>
+    {
+        const user = await createUser();
+        db.users.rows = db.users.rows.filter((row) => row.id !== user.id);
+
+        expect((await getMe(user.token)).status).toBe(401);
+    });
+
+    it('un error de la base no se responde como 401', async () =>
+    {
+        const user = await createUser();
+        vi.spyOn(fakePrisma.user, 'findUnique')
+            .mockRejectedValueOnce(new Error('base caída'));
+
+        const res = await getMe(user.token);
+
+        expect(res.status).toBe(500);
     });
 });
