@@ -4,14 +4,15 @@ import usersRouter from './routes/users.routes.js';
 import reviewsRouter from './routes/reviews.routes.js';
 import favoritesRouter from './routes/favorites.routes.js';
 import { requireAuth } from './middleware/auth.js';
+import { TRUSTED_PROXIES } from './lib/trustProxy.js';
 
 const app = express();
 
 /*
- * En Render la API corre detrás de un proxy: confiamos en un salto
+ * En Render la API corre detrás de varios proxies: ver TRUSTED_PROXIES
  * para que req.ip sea la IP real del cliente (lo usa el rate limiting).
  */
-app.set('trust proxy', 1);
+app.set('trust proxy', TRUSTED_PROXIES);
 
 app.use(express.json());
 
