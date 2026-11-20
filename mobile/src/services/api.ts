@@ -168,10 +168,7 @@ export async function createReview(
         }
     );
 
-    if (response.status === 401)
-    {
-        throw new InvalidSessionError();
-    }
+    await throwIfUnauthorized(response.status, token);
 
     if (!response.ok)
     {
@@ -217,6 +214,52 @@ export function isInvalidSessionError(
             error.name === 'InvalidSessionError'
         )
     );
+}
+
+/*
+ * Quien maneja la sesión (AuthContext) registra acá qué hacer cuando el
+ * servidor rechaza un token. Recibe el token rechazado para no cerrar
+ * una sesión más nueva si el 401 corresponde a un request viejo.
+ */
+type InvalidSessionHandler = (rejectedToken: string) => void | Promise<void>;
+
+let invalidSessionHandler: InvalidSessionHandler | null = null;
+
+export function setInvalidSessionHandler(
+    handler: InvalidSessionHandler | null
+): void
+{
+    invalidSessionHandler = handler;
+}
+
+/**
+ * Para requests autenticados: ante un 401 avisa al handler de sesión y
+ * tira InvalidSessionError. El server usa 401 solo para sesión inválida
+ * (la contraseña incorrecta en /me/password y DELETE /me es 403).
+ */
+async function throwIfUnauthorized(
+    status: number,
+    token: string
+): Promise<void>
+{
+    if (status !== 401)
+    {
+        return;
+    }
+
+    try
+    {
+        await invalidSessionHandler?.(token);
+    }
+    catch (error)
+    {
+        console.error(
+            'Error al cerrar la sesión inválida:',
+            error
+        );
+    }
+
+    throw new InvalidSessionError();
 }
 
 export class EmailVerificationRequiredError extends Error
@@ -398,10 +441,7 @@ export async function getCurrentUser(
         }
     );
     
-    if (response.status === 401)
-    {
-        throw new InvalidSessionError();
-    }
+    await throwIfUnauthorized(response.status, token);
 
     if (!response.ok)
     {
@@ -429,6 +469,8 @@ export async function updateProfile(
             }),
         }
     );
+
+    await throwIfUnauthorized(response.status, token);
 
     const data = await response.json();
 
@@ -464,6 +506,8 @@ export async function changePassword(
         }
     );
 
+    await throwIfUnauthorized(response.status, token);
+
     const data = await response.json();
 
     if (!response.ok)
@@ -495,6 +539,8 @@ export async function deleteAccount(
             }),
         }
     );
+
+    await throwIfUnauthorized(response.status, token);
 
     const data = await response.json();
 
@@ -586,6 +632,8 @@ export async function requestEmailChange(
         }
     );
 
+    await throwIfUnauthorized(response.status, token);
+
     const data = await response.json();
 
     if (!response.ok)
@@ -615,6 +663,8 @@ export async function verifyEmailChange(
             }),
         }
     );
+
+    await throwIfUnauthorized(response.status, token);
 
     const data = await response.json();
 
@@ -649,6 +699,8 @@ export async function uploadAvatar(
                 },
             }
         );
+
+    await throwIfUnauthorized(uploadResult.status, token);
 
     const data =
         uploadResult.body
@@ -711,6 +763,8 @@ export async function getFavorites(): Promise<Favorite[]>
         }
     );
 
+    await throwIfUnauthorized(response.status, token);
+
     if (!response.ok)
     {
         throw new Error('No se pudieron obtener los favoritos');
@@ -742,10 +796,7 @@ export async function addFavorite(
         }
     );
 
-    if (response.status === 401)
-    {
-        throw new InvalidSessionError();
-    }
+    await throwIfUnauthorized(response.status, token);
 
     if (!response.ok)
     {
@@ -778,6 +829,8 @@ export async function removeFavorite(
             },
         }
     );
+
+    await throwIfUnauthorized(response.status, token);
 
     if (!response.ok)
     {
@@ -829,6 +882,8 @@ export async function updateProfileWithAvatar(
             body: formData
         }
     );
+
+    await throwIfUnauthorized(response.status, token);
 
     if (!response.ok)
     {
