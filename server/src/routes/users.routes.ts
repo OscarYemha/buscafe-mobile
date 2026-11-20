@@ -265,19 +265,26 @@ router.patch(
                     10
                 );
 
-            await prisma.user.update({
-                where: {
-                    id: userId,
-                },
-                data: {
-                    passwordHash:
-                        newPasswordHash,
-                },
-            });
+            const updatedUser =
+                await prisma.user.update({
+                    where: {
+                        id: userId,
+                    },
+                    data: {
+                        passwordHash:
+                            newPasswordHash,
+                        tokenVersion: { increment: 1 },
+                    },
+                    select: {
+                        id: true,
+                        tokenVersion: true,
+                    },
+                });
 
             return res.json({
                 message:
                     'Contraseña actualizada correctamente',
+                token: signAuthToken(updatedUser),
             });
         }
         catch (error)
@@ -1298,6 +1305,7 @@ router.post(
                                 newPassword,
                                 10
                             ),
+                        tokenVersion: { increment: 1 },
                     })
                 );
 
