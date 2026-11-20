@@ -432,10 +432,16 @@ export function AuthProvider({children, }: {children: ReactNode})
             );
         }
 
-        await changePassword(
-            token,
-            currentPassword,
-            newPassword
+        const newToken =
+            await changePassword(
+                token,
+                currentPassword,
+                newPassword
+            );
+
+        await SecureStore.setItemAsync(
+            TOKEN_KEY,
+            newToken
         );
     };
 

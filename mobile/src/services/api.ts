@@ -447,7 +447,7 @@ export async function changePassword(
     token: string,
     currentPassword: string,
     newPassword: string
-): Promise<void>
+): Promise<string>
 {
     const response = await fetch(
         `${API_URL}/users/me/password`,
@@ -473,6 +473,8 @@ export async function changePassword(
             'No se pudo actualizar la contraseña'
         );
     }
+
+    return data.token;
 }
 
 export async function deleteAccount(
