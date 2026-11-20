@@ -27,12 +27,8 @@ producción → deploy manual → verificar → reactivar auto-deploy.
 Nunca mergees a master sin que Oscar lo pida.
 
 ## Pendiente
-- Deploy de fix/seguridad-auth (falta VERIFICATION_CODE_SECRET en
-  Render, migraciones hash_verification_codes_and_attempts y
-  add_user_token_version, después verificar y borrar GET /debug/ip).
-  Deployar el server antes de buildear el APK: la app espera el token
-  nuevo que devuelve PATCH /users/me/password, y que la contraseña
-  incorrecta sea 403 (con el server viejo, un 401 ahí la desloguea).
+- Supabase (plan gratuito) pausa el proyecto tras ~7 días sin uso y
+  producción queda sin base. Evitarlo: ping periódico o plan pago.
 - Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
   "Elegir zona", README desactualizado, npm audit en mobile.
 - Antes del APK: EXPO_PUBLIC_API_URL del environment preview de EAS
