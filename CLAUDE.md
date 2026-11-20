@@ -26,9 +26,12 @@ cargar variables nuevas en Render → mergear → aplicar migración en
 producción → deploy manual → verificar → reactivar auto-deploy.
 Nunca mergees a master sin que Oscar lo pida.
 
+Supabase (plan gratuito) pausa el proyecto tras ~7 días sin uso. Lo
+evita `.github/workflows/keepalive.yml`, que pinga GET /health a diario.
+GitHub desactiva ese workflow si el repo pasa 60 días sin commits:
+si llega el aviso, reactivarlo en Actions.
+
 ## Pendiente
-- Supabase (plan gratuito) pausa el proyecto tras ~7 días sin uso y
-  producción queda sin base. Evitarlo: ping periódico o plan pago.
 - Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
   "Elegir zona", README desactualizado, npm audit en mobile.
 - Antes del APK: EXPO_PUBLIC_API_URL del environment preview de EAS

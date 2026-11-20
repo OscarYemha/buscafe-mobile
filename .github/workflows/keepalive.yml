@@ -1,0 +1,33 @@
+# Pinga GET /health una vez por día. La consulta a la base evita que
+# Supabase (plan gratuito) pause el proyecto tras ~7 días sin actividad.
+#
+# Si falla, GitHub manda un mail: la API o la base de producción no
+# responden. Se puede correr a mano desde Actions → Keepalive → Run workflow.
+#
+# Ojo: GitHub desactiva los workflows programados si el repo pasa 60 días
+# sin commits. Avisa por mail antes y se reactiva con un clic en Actions.
+name: Keepalive
+
+on:
+  schedule:
+    - cron: '0 12 * * *' # todos los días, 12:00 UTC (9:00 en Argentina)
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HEALTH_URL: https://buscafe-api.onrender.com/health
+    steps:
+      - name: GET /health
+        # Los reintentos cubren el arranque en frío de Render, que puede
+        # tardar cerca de un minuto si el servicio estaba dormido.
+        run: |
+          curl --fail --silent --show-error \
+            --max-time 120 \
+            --retry 5 --retry-delay 30 --retry-all-errors \
+            "$HEALTH_URL"
+          echo
