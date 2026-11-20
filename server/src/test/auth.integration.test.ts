@@ -486,6 +486,13 @@ describe('tokenVersion: invalidación de sesiones', () =>
             .set('Authorization', `Bearer ${token}`)
             .send({ currentPassword, newPassword });
 
+    const deleteAccount = (token: string, password: string) =>
+        request(app)
+            .delete('/users/me')
+            .set('X-Forwarded-For', uniqueIp())
+            .set('Authorization', `Bearer ${token}`)
+            .send({ password });
+
     it('el login emite un token con la tokenVersion actual', async () =>
     {
         const user = await createUser();
@@ -573,10 +580,33 @@ describe('tokenVersion: invalidación de sesiones', () =>
 
         const res = await changePassword(user.token, 'incorrecta', 'nueva-contraseña');
 
-        expect(res.status).toBe(401);
+        // 403 y no 401: mobile trata todo 401 como sesión vencida.
+        expect(res.status).toBe(403);
         expect(res.body.token).toBeUndefined();
         expect(userRow(user.id).tokenVersion).toBe(0);
         expect((await getMe(user.token)).status).toBe(200);
+    });
+
+    it('borrar la cuenta con la contraseña incorrecta da 403 y no borra nada', async () =>
+    {
+        const user = await createUser();
+
+        const res = await deleteAccount(user.token, 'incorrecta');
+
+        expect(res.status).toBe(403);
+        expect(db.users.rows.some((row) => row.id === user.id)).toBe(true);
+        expect((await getMe(user.token)).status).toBe(200);
+    });
+
+    it('borrar la cuenta con la contraseña correcta invalida el token', async () =>
+    {
+        const user = await createUser();
+
+        const res = await deleteAccount(user.token, user.password);
+
+        expect(res.status).toBe(200);
+        expect(db.users.rows.some((row) => row.id === user.id)).toBe(false);
+        expect((await getMe(user.token)).status).toBe(401);
     });
 
     it('rechaza el token de un usuario que ya no existe', async () =>

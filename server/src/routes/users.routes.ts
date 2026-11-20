@@ -253,7 +253,7 @@ router.patch(
 
             if (!currentPasswordIsValid)
             {
-                return res.status(401).json({
+                return res.status(403).json({
                     error:
                         'La contraseña actual es incorrecta',
                 });
@@ -355,7 +355,7 @@ router.delete(
 
             if (!passwordIsValid)
             {
-                return res.status(401).json({
+                return res.status(403).json({
                     error:
                         'La contraseña actual es incorrecta',
                 });
