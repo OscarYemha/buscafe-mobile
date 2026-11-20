@@ -28,9 +28,10 @@ Nunca mergees a master sin que Oscar lo pida.
 
 ## Pendiente
 - Deploy de fix/seguridad-auth (falta VERIFICATION_CODE_SECRET en
-  Render, migración hash_verification_codes_and_attempts, después
-  verificar y borrar GET /debug/ip).
-- Resetear contraseña no invalida sesiones (tokenVersion).
+  Render, migraciones hash_verification_codes_and_attempts y
+  add_user_token_version, después verificar y borrar GET /debug/ip).
+  Deployar el server antes de buildear el APK: la app espera el token
+  nuevo que devuelve PATCH /users/me/password.
 - 401 sin manejar en el resto de rutas de mobile (ej. removeFavorite).
 - Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
   "Elegir zona", README desactualizado, npm audit en mobile.
