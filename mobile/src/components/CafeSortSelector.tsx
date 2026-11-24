@@ -18,7 +18,7 @@ const options: {
     label: string;
     icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-    { value: 'distance', label: 'Distancia', icon: 'navigate-outline' },
+    { value: 'distance', label: 'Distancia', icon: 'navigate' },
     { value: 'google', label: 'Puntuación de Google', icon: 'star' },
     { value: 'buscafe', label: 'Puntuación de BusCafé', icon: 'star' },
 ];
