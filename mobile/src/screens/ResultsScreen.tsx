@@ -215,7 +215,7 @@ export default function ResultsScreen({ route, navigation }: Props)
                         accessibilityLabel={`Buscando en ${searchLocation.label}. Cambiar zona`}
                     >
                         <Ionicons
-                            name={searchLocation.mode === 'zone' ? 'location' : 'navigate'}
+                            name="location"
                             size={15}
                             color="#6B3A22"
                         />
