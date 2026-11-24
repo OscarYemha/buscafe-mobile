@@ -229,6 +229,8 @@ const withCafe = (row: Row, include?: Record<string, unknown>): Row =>
 };
 
 export const fakePrisma = {
+    // Solo lo usa GET /health (SELECT 1).
+    $queryRaw: async () => [{ '?column?': 1 }],
     user: {
         findUnique: async ({ where = {}, select }: Args) =>
         {
