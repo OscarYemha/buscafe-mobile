@@ -452,12 +452,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E8D9C7',
         backgroundColor: '#FFFFFF',
-        alignSelf: 'flex-start',
-        maxWidth: '100%',
     },
 
     zoneBannerText: {
-        flexShrink: 1,
+        flex: 1,
         fontSize: 14,
         color: '#4A2416',
     },
