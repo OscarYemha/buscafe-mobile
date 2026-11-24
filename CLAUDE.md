@@ -43,6 +43,10 @@ si llega el aviso, reactivarlo en Actions.
   se toca un marcador de la parte de arriba. Arreglo propuesto: ocultar
   el botón mientras haya café seleccionado (MapScreen.tsx, condición
   `showSearchAreaButton && !explorationLoading` → sumar `&& !selectedCafe`).
+- Mapa: "Buscar en esta zona" aparece demasiado rápido (al soltar el mapa,
+  con mover un 15 % o zoom de 20 %; hasSignificantMapMovement en
+  MapScreen.tsx). Subir el umbral (~30 % / ~35 %) y mostrarlo tras ~700 ms
+  con el mapa quieto, cancelando si se vuelve a mover.
 - Ubicación: en getCurrentLocation (mobile/src/services/location.ts) el
   fallback getLastKnownPositionAsync no tiene timeout. Si Google Play
   Services no responde (p. ej. desactivado), Home queda en "Buscando
