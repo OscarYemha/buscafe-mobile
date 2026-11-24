@@ -1078,6 +1078,7 @@ const styles = StyleSheet.create({
     },
 
     searchAreaButton: {
+        alignItems: 'center',
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -1135,7 +1136,8 @@ const styles = StyleSheet.create({
     searchAreaContainer: {
         position: 'absolute',
         top: 70,
-        alignSelf: 'center',
+        left: 20,
+        right: 20,
         zIndex: 15,
     },
 });

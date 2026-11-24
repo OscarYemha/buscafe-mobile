@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#7A6254',
+        color: '#6B3A22',
     },
 
     trigger: {
