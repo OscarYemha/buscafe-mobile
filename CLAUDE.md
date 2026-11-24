@@ -37,10 +37,14 @@ GitHub desactiva ese workflow si el repo pasa 60 días sin commits:
 si llega el aviso, reactivarlo en Actions.
 
 ## Pendiente
-- Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
-  "Elegir zona", README desactualizado.
-- Antes del APK: EXPO_PUBLIC_API_URL del environment preview de EAS
-  debe apuntar a Render.
+- Lista de ChatGPT: abierto/cerrado en mapa, "Elegir zona", README
+  desactualizado.
+- Mapa: el botón "Buscar en esta zona" tapa la tarjeta del café cuando
+  se toca un marcador de la parte de arriba. Arreglo propuesto: ocultar
+  el botón mientras haya café seleccionado (MapScreen.tsx, condición
+  `showSearchAreaButton && !explorationLoading` → sumar `&& !selectedCafe`).
+- Próximo APK: incluir expo-updates para mandar cambios de JS por
+  EAS Update sin gastar builds.
 - Después de validar el APK: actualizar a Expo SDK 58 (tarea aparte).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.
