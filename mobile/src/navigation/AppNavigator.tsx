@@ -31,8 +31,8 @@ export type RootStackParamlist = {
     Search: undefined;
     Results: {
         intent?: CafeIntent;
-        latitude: number;
-        longitude: number;
+        latitude?: number;
+        longitude?: number;
     };
     ChooseZone: undefined;
     CafeDetail: {
