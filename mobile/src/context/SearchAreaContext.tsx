@@ -5,6 +5,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -163,4 +164,30 @@ export function useActiveSearchLocation(): ActiveSearchLocation
         mode: 'nearby',
         isReady: isSearchAreaReady,
     };
+}
+
+/**
+ * Igual que useActiveSearchLocation, pero en modo "cerca de mí" se queda
+ * con la primera ubicación conocida: así Resultados no vuelve a buscar
+ * cada vez que el GPS se actualiza mientras caminás. Cambia solo si se
+ * elige otra zona (o "cerca de mí" de nuevo después de una zona).
+ */
+export function useStableSearchLocation(): ActiveSearchLocation
+{
+    const active = useActiveSearchLocation();
+    const frozenRef = useRef<{
+        key: string;
+        coordinates: ActiveSearchLocation['coordinates'];
+    } | null>(null);
+
+    const key = active.mode === 'zone' && active.coordinates
+        ? `zone:${active.coordinates.latitude},${active.coordinates.longitude}`
+        : 'nearby';
+
+    if (frozenRef.current?.key !== key || frozenRef.current.coordinates === null)
+    {
+        frozenRef.current = { key, coordinates: active.coordinates };
+    }
+
+    return { ...active, coordinates: frozenRef.current.coordinates };
 }
