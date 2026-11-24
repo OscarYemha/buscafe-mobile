@@ -43,6 +43,10 @@ si llega el aviso, reactivarlo en Actions.
   se toca un marcador de la parte de arriba. Arreglo propuesto: ocultar
   el botón mientras haya café seleccionado (MapScreen.tsx, condición
   `showSearchAreaButton && !explorationLoading` → sumar `&& !selectedCafe`).
+- Ubicación: en getCurrentLocation (mobile/src/services/location.ts) el
+  fallback getLastKnownPositionAsync no tiene timeout. Si Google Play
+  Services no responde (p. ej. desactivado), Home queda en "Buscando
+  cafeterías cercanas…" para siempre. Envolverlo también en withTimeout.
 - Próximo APK: incluir expo-updates para mandar cambios de JS por
   EAS Update sin gastar builds.
 - Después de validar el APK: actualizar a Expo SDK 58 (tarea aparte).
