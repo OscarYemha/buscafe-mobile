@@ -16,6 +16,7 @@ import {
     watchUserLocation,
 } from '../services/location';
 import * as Location from 'expo-location';
+import { calculateDistanceMeters } from '../utils/distance';
 
 const MOVEMENT_THRESHOLD_METERS = 50;
 const SIGNIFICANT_ACCURACY_IMPROVEMENT_METERS = 10;
@@ -40,49 +41,6 @@ const NearbyCafesContext =
 type Props = {
     children: ReactNode;
 };
-
-function degreesToRadians(degrees: number): number
-{
-    return degrees * (Math.PI / 180);
-}
-
-function calculateLocationDistanceMeters(
-    location1: UserLocation,
-    location2: UserLocation
-): number
-{
-    const earthRadiusMeters = 6371000;
-
-    const latitudeDifference =
-        degreesToRadians(
-            location2.latitude - location1.latitude
-        );
-
-    const longitudeDifference =
-        degreesToRadians(
-            location2.longitude - location1.longitude
-        );
-
-    const latitude1 =
-        degreesToRadians(location1.latitude);
-
-    const latitude2 =
-        degreesToRadians(location2.latitude);
-
-    const a =
-        Math.sin(latitudeDifference / 2) ** 2 +
-        Math.cos(latitude1) *
-            Math.cos(latitude2) *
-            Math.sin(longitudeDifference / 2) ** 2;
-
-    const c =
-        2 * Math.atan2(
-            Math.sqrt(a),
-            Math.sqrt(1 - a)
-        );
-
-    return earthRadiusMeters * c;
-}
 
 export function NearbyCafesProvider(
     { children }: Props
@@ -391,7 +349,7 @@ export function NearbyCafesProvider(
                                 }
 
                                 const distanceMeters =
-                                    calculateLocationDistanceMeters(
+                                    calculateDistanceMeters(
                                         selectedLocation,
                                         location
                                     );
@@ -421,7 +379,7 @@ export function NearbyCafesProvider(
                                     }
 
                                     const candidateDistance =
-                                        calculateLocationDistanceMeters(
+                                        calculateDistanceMeters(
                                             candidate,
                                             location
                                         );
