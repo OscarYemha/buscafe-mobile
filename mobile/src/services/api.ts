@@ -5,6 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { File } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
 import { apiErrorFromResponse } from './apiError';
+import { Zone, ZoneSuggestion } from '../types/Zone';
 
 const API_URL =
     process.env.EXPO_PUBLIC_API_URL ??
@@ -51,6 +52,63 @@ export async function getNearbyCafes(
     if (!response.ok)
     {
         throw new Error('No se pudieron obtener las cafeterías cercanas');
+    }
+
+    return response.json();
+}
+
+/**
+ * Sugerencias de zonas (barrios, ciudades) para "Elegir zona".
+ * `sessionToken` agrupa en Google las consultas de una misma búsqueda;
+ * `near` prioriza las zonas cercanas al usuario.
+ */
+export async function searchZones(
+    query: string,
+    sessionToken: string,
+    near?: { latitude: number; longitude: number }
+): Promise<ZoneSuggestion[]>
+{
+    const params = new URLSearchParams({ query, sessionToken });
+
+    if (near)
+    {
+        params.set('latitude', String(near.latitude));
+        params.set('longitude', String(near.longitude));
+    }
+
+    const response = await fetch(`${API_URL}/zones?${params}`);
+
+    if (!response.ok)
+    {
+        throw await apiErrorFromResponse(
+            response,
+            'No se pudieron buscar zonas'
+        );
+    }
+
+    const data: { zones: ZoneSuggestion[] } = await response.json();
+
+    return data.zones;
+}
+
+/** Coordenadas de la zona elegida. Cierra la sesión de búsqueda. */
+export async function getZone(
+    placeId: string,
+    sessionToken: string
+): Promise<Zone>
+{
+    const params = new URLSearchParams({ sessionToken });
+
+    const response = await fetch(
+        `${API_URL}/zones/${encodeURIComponent(placeId)}?${params}`
+    );
+
+    if (!response.ok)
+    {
+        throw await apiErrorFromResponse(
+            response,
+            'No se pudo obtener la zona'
+        );
     }
 
     return response.json();
