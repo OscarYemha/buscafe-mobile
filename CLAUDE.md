@@ -41,3 +41,6 @@ si llega el aviso, reactivarlo en Actions.
   "Elegir zona", README desactualizado.
 - Antes del APK: EXPO_PUBLIC_API_URL del environment preview de EAS
   debe apuntar a Render.
+- Después de validar el APK: actualizar a Expo SDK 58 (tarea aparte).
+  Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
+  de react-native-maps espera el 58 y si se puede sacar la exclusión.

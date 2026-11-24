@@ -13,10 +13,14 @@ type Props = {
     onChange: (value: CafeSortOption) => void;
 };
 
-const options: { value: CafeSortOption; label: string }[] = [
-    { value: 'distance', label: 'Distancia' },
-    { value: 'google', label: '★ Puntuación de Google' },
-    { value: 'buscafe', label: '★ Puntuación de BusCafé' },
+const options: {
+    value: CafeSortOption;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+    { value: 'distance', label: 'Distancia', icon: 'navigate' },
+    { value: 'google', label: 'Puntuación de Google', icon: 'star' },
+    { value: 'buscafe', label: 'Puntuación de BusCafé', icon: 'star' },
 ];
 
 export default function CafeSortSelector({ value, onChange }: Props)
@@ -39,9 +43,19 @@ export default function CafeSortSelector({ value, onChange }: Props)
                         accessibilityLabel="Seleccionar ordenamiento"
                         accessibilityState={{ expanded }}
                     >
-                        <Text style={styles.triggerText}>
-                            {selectedOption?.label}
-                        </Text>
+                        <View style={styles.optionLabel}>
+                            {selectedOption && (
+                                <Ionicons
+                                    name={selectedOption.icon}
+                                    size={15}
+                                    color="#6B3A22"
+                                />
+                            )}
+
+                            <Text style={styles.triggerText}>
+                                {selectedOption?.label}
+                            </Text>
+                        </View>
 
                         <Ionicons
                             name={expanded ? 'chevron-up' : 'chevron-down'}
@@ -63,6 +77,12 @@ export default function CafeSortSelector({ value, onChange }: Props)
                                     setExpanded(false);
                                 }}
                             >
+                                <Ionicons
+                                    name={option.icon}
+                                    size={15}
+                                    color="#6B3A22"
+                                />
+
                                 <Text
                                     style={[
                                         styles.optionText,
@@ -126,7 +146,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: '100%',
         right: 0,
-        width: 200,
+        width: 240,
         marginTop: 4,
         borderRadius: 12,
         borderWidth: 1,
@@ -161,5 +181,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
+    },
+
+    optionLabel: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
 });
