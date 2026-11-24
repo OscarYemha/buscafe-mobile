@@ -3,6 +3,7 @@ import cafesRouter from './routes/cafes.routes.js';
 import usersRouter from './routes/users.routes.js';
 import reviewsRouter from './routes/reviews.routes.js';
 import favoritesRouter from './routes/favorites.routes.js';
+import zonesRouter from './routes/zones.routes.js';
 import { TRUSTED_PROXIES } from './lib/trustProxy.js';
 import prisma from './lib/prisma.js';
 
@@ -45,5 +46,6 @@ app.use('/cafes', cafesRouter);
 app.use('/users', usersRouter);
 app.use('/reviews', reviewsRouter);
 app.use('/favorites', favoritesRouter);
+app.use('/zones', zonesRouter);
 
 export default app;

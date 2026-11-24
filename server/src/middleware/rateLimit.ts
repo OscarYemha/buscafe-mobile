@@ -183,3 +183,13 @@ export const createResourceRateLimiters = () => ({
             'Llegaste al límite de favoritos por hora. Probá de nuevo más tarde.'
         ),
 });
+
+/*
+ * "Elegir zona" consulta Google Places mientras el usuario escribe. Con la
+ * espera entre teclas de la app, una búsqueda son unas pocas llamadas: el
+ * límite deja margen para usarla normal y frena el abuso.
+ */
+export const createZoneRateLimiters = () => ({
+    zonesByIp:
+        byIp('zones-ip', 15 * MINUTE, 150, TOO_MANY_REQUESTS),
+});
