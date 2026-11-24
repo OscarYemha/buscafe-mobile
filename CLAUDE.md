@@ -3,6 +3,11 @@
 App para descubrir cafeterías. `mobile/` (Expo 57, React Native) y
 `server/` (Express 5, Prisma 7, Postgres). Autor: Oscar. Respondé en castellano rioplatense.
 
+`react-native-maps` va en 1.29 a propósito aunque Expo 57 espere 1.27.2:
+la 1.27 tenía problemas de renderizado en el mapa. Está excluido de los
+chequeos de Expo (`expo.install.exclude` en mobile/package.json); no
+bajarlo con `expo install --fix`.
+
 ## Cómo trabajamos
 - Modo mixto: los cambios chicos o los que quiero entender, explicámelos
   y dejame escribirlos a mí (decime archivo, lugar y qué poner). Los
