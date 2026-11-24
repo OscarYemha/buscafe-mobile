@@ -21,6 +21,8 @@ import CafeSortSelector from '../components/CafeSortSelector';
 import { CafeSortOption, sortCafes } from '../utils/sortCafes';
 import { Ionicons } from '@expo/vector-icons';
 import { useStableSearchLocation } from '../context/SearchAreaContext';
+import { useNearbyCafes } from '../context/NearbyCafesContext';
+import { calculateDistanceKm } from '../utils/distance';
 
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'Results'>;
@@ -35,6 +37,7 @@ export default function ResultsScreen({ route, navigation }: Props)
     } = route.params;
 
     const searchLocation = useStableSearchLocation();
+    const { userLocation } = useNearbyCafes();
 
     // "Ver todos" de Home manda coordenadas fijas (GPS); las categorías
     // usan la zona activa (cerca de mí o la zona elegida).
@@ -192,10 +195,33 @@ export default function ResultsScreen({ route, navigation }: Props)
         ? `Cafés para ${intentOption.description}`
         : 'Cafés cerca de vos';
 
+    /*
+     * El server mide la distancia desde el punto de búsqueda. Con una zona
+     * elegida ese punto es el centro de la zona, no el usuario: la
+     * recalculamos desde su ubicación real, o la ocultamos si no la hay.
+     */
+    const searchesInZone =
+        followsSearchArea && searchLocation.mode === 'zone';
+
+    const cafesWithDistance = useMemo(() =>
+    {
+        if (!searchesInZone)
+        {
+            return cafes;
+        }
+
+        return cafes.map((cafe) => ({
+            ...cafe,
+            distanceKm: userLocation
+                ? calculateDistanceKm(userLocation, cafe)
+                : null,
+        }));
+    }, [cafes, searchesInZone, userLocation]);
+
     const sortedCafes = useMemo(() =>
     {
-        return sortCafes(cafes, sortBy);
-    }, [cafes, sortBy]);
+        return sortCafes(cafesWithDistance, sortBy);
+    }, [cafesWithDistance, sortBy]);
 
     return (
         <SafeAreaView

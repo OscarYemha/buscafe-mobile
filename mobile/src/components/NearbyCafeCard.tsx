@@ -100,9 +100,12 @@ export default function NearbyCafeCard({
             </View>
 
             <View style={styles.infoRow}>
-                <Text style={styles.info}>
-                    {distanceLabel}
-                </Text>
+                {/* Sin distancia (zona elegida sin ubicación) no hay desde dónde medir. */}
+                {cafe.distanceKm !== null && (
+                    <Text style={styles.info}>
+                        {distanceLabel}
+                    </Text>
+                )}
 
                 <Text style={styles.info}>
                     {priceLabel}
