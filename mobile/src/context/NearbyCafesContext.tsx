@@ -27,7 +27,8 @@ type NearbyCafesContextValue = {
     loading: boolean;
     error: string | null;
     canAskLocationAgain: boolean;
-    refreshNearbyCafes: () => Promise<void>;
+    /** askPermission: false para refrescos automáticos (ver getCurrentLocation). */
+    refreshNearbyCafes: (options?: { askPermission?: boolean }) => Promise<void>;
     markWaitingForLocationSettings: () => void;
     locationServicesDisabled: boolean;
     enableLocationServices: () => Promise<void>;
@@ -183,7 +184,9 @@ export function NearbyCafesProvider(
         );
 
     const refreshNearbyCafes =
-        useCallback(async () =>
+        useCallback(async (
+            options: { askPermission?: boolean } = {}
+        ) =>
         {
             if (manualRefreshInProgressRef.current)
             {
@@ -199,7 +202,7 @@ export function NearbyCafesProvider(
 
             try
             {
-                const result = await getCurrentLocation();
+                const result = await getCurrentLocation(options);
 
                 if (requestId !== requestIdRef.current)
                 {
@@ -517,7 +520,9 @@ export function NearbyCafesProvider(
 
                 waitingForLocationSettings.current = false;
 
-                void refreshNearbyCafes();
+                // Solo consultar el permiso: pedirlo acá arma un loop
+                // (ver getCurrentLocation).
+                void refreshNearbyCafes({ askPermission: false });
             }
         );
 

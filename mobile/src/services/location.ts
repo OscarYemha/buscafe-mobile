@@ -37,13 +37,26 @@ export type LocationResult =
       status: 'services-disabled';
     };
 
-export async function getCurrentLocation():
-  Promise<LocationResult>
+/**
+ * `askPermission: false` solo consulta el permiso, sin pedirlo. En Android,
+ * pedirlo abre una pantalla del sistema que manda la app a segundo plano y
+ * la trae de vuelta (aunque se cierre sola al instante): si se pide al
+ * volver a primer plano, se arma un loop.
+ */
+export async function getCurrentLocation(
+  { askPermission = true }: { askPermission?: boolean } = {}
+): Promise<LocationResult>
 {
   let permission =
     await Location.getForegroundPermissionsAsync();
 
-  if (permission.status !== 'granted')
+  // Con canAskAgain en false Android ya no muestra el diálogo: no tiene
+  // sentido pedirlo.
+  if (
+    permission.status !== 'granted' &&
+    askPermission &&
+    permission.canAskAgain
+  )
   {
     permission =
       await Location.requestForegroundPermissionsAsync();

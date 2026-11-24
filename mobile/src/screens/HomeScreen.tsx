@@ -134,7 +134,7 @@ export default function HomeScreen({navigation}: Props) {
       lastReviewsVersion.current =
         reviewsVersion;
 
-      void refreshNearbyCafes();
+      void refreshNearbyCafes({ askPermission: false });
     }, [
       reviewsVersion,
       refreshNearbyCafes,
