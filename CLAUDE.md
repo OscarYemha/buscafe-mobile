@@ -38,6 +38,6 @@ si llega el aviso, reactivarlo en Actions.
 
 ## Pendiente
 - Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
-  "Elegir zona", README desactualizado, npm audit en mobile.
+  "Elegir zona", README desactualizado.
 - Antes del APK: EXPO_PUBLIC_API_URL del environment preview de EAS
   debe apuntar a Render.
