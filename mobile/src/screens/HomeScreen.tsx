@@ -134,7 +134,7 @@ export default function HomeScreen({navigation}: Props) {
       lastReviewsVersion.current =
         reviewsVersion;
 
-      void refreshNearbyCafes();
+      void refreshNearbyCafes({ askPermission: false });
     }, [
       reviewsVersion,
       refreshNearbyCafes,
@@ -197,15 +197,9 @@ export default function HomeScreen({navigation}: Props) {
                     key={option.id}
                     style={styles.optionCard}
                     onPress={() => {
-                        if (!userLocation) {
-                            return;
-                        }
-
-                        navigation.navigate('Results', {
-                            intent: option.id,
-                            latitude: userLocation.latitude,
-                            longitude: userLocation.longitude,
-                        });
+                      navigation.navigate('Results', {
+                          intent: option.id,
+                      });
                     }}
                 >
                     <Text style={styles.optionIcon}>{option.icon}</Text>

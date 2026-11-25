@@ -35,12 +35,23 @@ import {
     MainTabParamList,
     RootStackParamlist,
 } from '../navigation/AppNavigator';
+import { getOpenStatus } from '../utils/openStatus';
 
 
 type MapPoint = { x: number; y: number };
 
 const CARD_WIDTH = 252;
 const PIN_VERTICAL_OFFSET = 36;
+
+/*
+ * "Buscar en esta zona": aparece si el mapa se movió al menos un 30 % de
+ * la pantalla o cambió el zoom un 35 %, y recién cuando quedó quieto
+ * 700 ms (si se vuelve a mover antes, se cancela). Con menos, aparecía
+ * con cualquier desplazamiento chico.
+ */
+const SEARCH_AREA_MIN_MOVEMENT = 0.30;
+const SEARCH_AREA_MIN_ZOOM_CHANGE = 0.35;
+const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 
 // Proyección de Mercator para acompañar el gesto sin esperar al puente nativo.
 function mercatorY(latitude: number): number
@@ -97,6 +108,38 @@ export default function MapScreen(
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
     const [exploredRegion, setExploredRegion] = useState<Region | null>(null);
     const [showSearchAreaButton, setShowSearchAreaButton] = useState(false);
+
+    const searchAreaTimerRef =
+        useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    function cancelSearchAreaButtonTimer()
+    {
+        if (searchAreaTimerRef.current)
+        {
+            clearTimeout(searchAreaTimerRef.current);
+            searchAreaTimerRef.current = null;
+        }
+    }
+
+    function hideSearchAreaButton()
+    {
+        cancelSearchAreaButtonTimer();
+        setShowSearchAreaButton(false);
+    }
+
+    function showSearchAreaButtonAfterDelay()
+    {
+        cancelSearchAreaButtonTimer();
+
+        searchAreaTimerRef.current = setTimeout(() =>
+        {
+            searchAreaTimerRef.current = null;
+            setShowSearchAreaButton(true);
+        }, SEARCH_AREA_BUTTON_DELAY_MS);
+    }
+
+    // Que no quede un timer vivo al salir de la pantalla.
+    useEffect(() => cancelSearchAreaButtonTimer, []);
     const [explorationCafes, setExplorationCafes] = useState<CafeSummary[] | null>(null);
     const [explorationLoading, setExplorationLoading] = useState(false);
     const [explorationError, setExplorationError] = useState<string | null>(null);
@@ -133,6 +176,10 @@ export default function MapScreen(
     const selectedCafe = displayedCafes.find(
         cafe => cafe.googlePlaceId === selectedCafeId
     ) ?? null;
+
+    const selectedCafeStatus = selectedCafe
+        ? getOpenStatus(selectedCafe.isOpen)
+        : null;
 
     const sortedCafes = [...displayedCafes].sort((a, b) => {
         if (a.distanceKm === null && b.distanceKm === null)
@@ -180,9 +227,9 @@ export default function MapScreen(
         );
 
         return (
-            latitudeMovement >= 0.15 ||
-            longitudeMovement >= 0.15 ||
-            zoomChange >= 0.20
+            latitudeMovement >= SEARCH_AREA_MIN_MOVEMENT ||
+            longitudeMovement >= SEARCH_AREA_MIN_MOVEMENT ||
+            zoomChange >= SEARCH_AREA_MIN_ZOOM_CHANGE
         );
     }
 
@@ -274,7 +321,7 @@ export default function MapScreen(
 
         setExplorationLoading(true);
         setExplorationError(null);
-        setShowSearchAreaButton(false);
+        hideSearchAreaButton();
 
         try
         {
@@ -333,7 +380,7 @@ export default function MapScreen(
         setExplorationCafes(null);
         setExplorationError(null);
         setExplorationLoading(false);
-        setShowSearchAreaButton(false);
+        hideSearchAreaButton();
         setExploredRegion(null);
         setSelectedCafeId(null);
 
@@ -504,6 +551,7 @@ export default function MapScreen(
                             if (details?.isGesture === true)
                             {
                                 isMapGestureActiveRef.current = true;
+                                cancelSearchAreaButtonTimer();
                             }
                             currentRegionRef.current = region;
                             // Máximo ~30 actualizaciones/segundo durante el gesto.
@@ -558,11 +606,11 @@ export default function MapScreen(
 
                                     setSelectedCafeId(null);
                                     setPopupPoint(null);
-                                    setShowSearchAreaButton(true);
+                                    showSearchAreaButtonAfterDelay();
                                 }
                                 else
                                 {
-                                    setShowSearchAreaButton(false);
+                                    hideSearchAreaButton();
                                 }
                             }
 
@@ -671,6 +719,16 @@ export default function MapScreen(
                                 <Text style={styles.popupAddress} numberOfLines={1}>
                                     📍 {selectedCafe.shortAddress}
                                 </Text>
+                                {selectedCafeStatus && (
+                                    <Text
+                                        style={[
+                                            styles.popupStatus,
+                                            { color: selectedCafeStatus.color },
+                                        ]}
+                                    >
+                                        ● {selectedCafeStatus.label}
+                                    </Text>
+                                )}
                                 <View style={styles.popupDivider} />
                                 <View style={styles.popupRatingRow}>
                                     <View style={styles.popupRatingColumn}>
@@ -710,7 +768,7 @@ export default function MapScreen(
                             </Text>
                         </TouchableOpacity>
                     </View>
-                    {showSearchAreaButton && !explorationLoading && (
+                    {showSearchAreaButton && !explorationLoading && !selectedCafe && (
                         <View
                             style={styles.searchAreaContainer}
                             pointerEvents="box-none"
@@ -841,11 +899,27 @@ export default function MapScreen(
                                         </Text>
                                     </View>
 
-                                    <Text style={styles.cafeDistance}>
-                                        {cafe.distanceKm !== null
-                                            ? `${cafe.distanceKm.toFixed(1)} km`
-                                            : '—'}
-                                    </Text>
+                                    <View style={styles.cafeSideInfo}>
+                                        <Text style={styles.cafeDistance}>
+                                            {cafe.distanceKm !== null
+                                                ? `${cafe.distanceKm.toFixed(1)} km`
+                                                : '—'}
+                                        </Text>
+                                        {(() => {
+                                            const status = getOpenStatus(cafe.isOpen);
+
+                                            return status && (
+                                                <Text
+                                                    style={[
+                                                        styles.cafeStatus,
+                                                        { color: status.color },
+                                                    ]}
+                                                >
+                                                    {status.label}
+                                                </Text>
+                                            );
+                                        })()}
+                                    </View>
                                 </TouchableOpacity>
                             )}
                         />
@@ -936,6 +1010,7 @@ const styles = StyleSheet.create({
     },
     popupCoffee: { fontSize: 17, marginLeft: 8 },
     popupAddress: { marginTop: 5, color: '#7A6254', fontSize: 12 },
+    popupStatus: { marginTop: 4, fontSize: 12, fontWeight: '700' },
     popupDivider: {
         height: 1,
         backgroundColor: '#E8D9C7',
@@ -1039,6 +1114,16 @@ const styles = StyleSheet.create({
         color: '#6B3A22',
     },
 
+    cafeSideInfo: {
+        alignItems: 'flex-end',
+        gap: 2,
+    },
+
+    cafeStatus: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+
     locationCard: {
         width: '100%',
         backgroundColor: '#FFFFFF',
@@ -1078,6 +1163,7 @@ const styles = StyleSheet.create({
     },
 
     searchAreaButton: {
+        alignItems: 'center',
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -1135,7 +1221,8 @@ const styles = StyleSheet.create({
     searchAreaContainer: {
         position: 'absolute',
         top: 70,
-        alignSelf: 'center',
+        left: 20,
+        right: 20,
         zIndex: 15,
     },
 });

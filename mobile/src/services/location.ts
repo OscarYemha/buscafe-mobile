@@ -2,6 +2,8 @@ import * as Location from 'expo-location';
 
 const LOCATION_TIMEOUT_MS = 10000;
 const LAST_KNOWN_MAX_AGE_MS = 10 * 60 * 1000;
+// Leer la última posición es casi instantáneo cuando funciona.
+const LAST_KNOWN_TIMEOUT_MS = 3000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T>
 {
@@ -37,13 +39,26 @@ export type LocationResult =
       status: 'services-disabled';
     };
 
-export async function getCurrentLocation():
-  Promise<LocationResult>
+/**
+ * `askPermission: false` solo consulta el permiso, sin pedirlo. En Android,
+ * pedirlo abre una pantalla del sistema que manda la app a segundo plano y
+ * la trae de vuelta (aunque se cierre sola al instante): si se pide al
+ * volver a primer plano, se arma un loop.
+ */
+export async function getCurrentLocation(
+  { askPermission = true }: { askPermission?: boolean } = {}
+): Promise<LocationResult>
 {
   let permission =
     await Location.getForegroundPermissionsAsync();
 
-  if (permission.status !== 'granted')
+  // Con canAskAgain en false Android ya no muestra el diálogo: no tiene
+  // sentido pedirlo.
+  if (
+    permission.status !== 'granted' &&
+    askPermission &&
+    permission.canAskAgain
+  )
   {
     permission =
       await Location.requestForegroundPermissionsAsync();
@@ -78,9 +93,14 @@ export async function getCurrentLocation():
   }
   catch (error)
   {
-    location = await Location.getLastKnownPositionAsync({
-      maxAge: LAST_KNOWN_MAX_AGE_MS,
-    });
+    // También con timeout: si Google Play Services no responde (por ejemplo,
+    // desactivado), esta llamada puede quedar colgada para siempre.
+    location = await withTimeout(
+      Location.getLastKnownPositionAsync({
+        maxAge: LAST_KNOWN_MAX_AGE_MS,
+      }),
+      LAST_KNOWN_TIMEOUT_MS
+    ).catch(() => null);
 
     if (!location)
     {

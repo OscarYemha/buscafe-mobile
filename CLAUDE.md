@@ -25,6 +25,17 @@ bajarlo con `expo install --fix`.
   las aplica Oscar durante el deploy.
 - Si Postgres no responde (ECONNREFUSED): `sudo systemctl start postgresql`.
 
+## APK y actualizaciones (EAS)
+- APK: `npx eas-cli build -p android --profile preview` (gasta un build del
+  cupo mensual). Hace falta uno nuevo solo si cambia algo nativo (SDK,
+  paquetes con código nativo, app.config.js).
+- Cambios de JS: `npm run update:preview` en mobile/ los manda por aire al
+  APK (canal preview). Nunca correr `eas update` sin `--environment
+  preview`: usaría la IP local de mobile/.env y la app de producción
+  dejaría de andar.
+- runtimeVersion usa la política "fingerprint": si cambió algo nativo,
+  la actualización no le llega a los APK viejos (hace falta APK nuevo).
+
 ## Deploy (Render, auto-deploy desde master)
 Mergear a master despliega. Procedimiento: desactivar auto-deploy →
 cargar variables nuevas en Render → mergear → aplicar migración en
@@ -37,10 +48,10 @@ GitHub desactiva ese workflow si el repo pasa 60 días sin commits:
 si llega el aviso, reactivarlo en Actions.
 
 ## Pendiente
-- Lista de ChatGPT: validar mapa en APK, abierto/cerrado en mapa,
-  "Elegir zona", README desactualizado.
-- Antes del APK: EXPO_PUBLIC_API_URL del environment preview de EAS
-  debe apuntar a Render.
+- README desactualizado (último ítem de la lista de ChatGPT).
+- Probar en el próximo APK lo que en Expo Go no se ve (el mapa sale gris
+  porque Expo Go trae react-native-maps 1.27): "Buscar en esta zona"
+  (demora y que no tape la tarjeta) y abierto/cerrado en el mapa.
 - Después de validar el APK: actualizar a Expo SDK 58 (tarea aparte).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.

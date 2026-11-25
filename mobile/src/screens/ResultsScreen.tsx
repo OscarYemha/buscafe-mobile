@@ -19,13 +19,42 @@ import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import CafeSortSelector from '../components/CafeSortSelector';
 import { CafeSortOption, sortCafes } from '../utils/sortCafes';
+import { Ionicons } from '@expo/vector-icons';
+import { useStableSearchLocation } from '../context/SearchAreaContext';
+import { useNearbyCafes } from '../context/NearbyCafesContext';
+import { calculateDistanceKm } from '../utils/distance';
+
 
 type Props = NativeStackScreenProps<RootStackParamlist, 'Results'>;
 
 
 export default function ResultsScreen({ route, navigation }: Props)
 {
-    const { intent, latitude, longitude } = route.params;
+    const {
+        intent,
+        latitude: fixedLatitude,
+        longitude: fixedLongitude,
+    } = route.params;
+
+    const searchLocation = useStableSearchLocation();
+    const { userLocation } = useNearbyCafes();
+
+    // "Ver todos" de Home manda coordenadas fijas (GPS); las categorías
+    // usan la zona activa (cerca de mí o la zona elegida).
+    const followsSearchArea =
+        fixedLatitude === undefined || fixedLongitude === undefined;
+
+    const latitude = followsSearchArea
+        ? searchLocation.coordinates?.latitude
+        : fixedLatitude;
+
+    const longitude = followsSearchArea
+        ? searchLocation.coordinates?.longitude
+        : fixedLongitude;
+
+    const isWaitingForSearchArea =
+        followsSearchArea && !searchLocation.isReady;
+
 
     const scrollViewRef = useRef<ScrollView>(null);
     const requestIdRef = useRef(0);
@@ -48,6 +77,18 @@ export default function ResultsScreen({ route, navigation }: Props)
     {
         if (isRefreshing && requestInProgressRef.current)
         {
+            return;
+        }
+
+        if (isWaitingForSearchArea)
+        {
+            return;
+        }
+
+        if (latitude === undefined || longitude === undefined)
+        {
+            setCafes([]);
+            setLoading(false);
             return;
         }
 
@@ -106,7 +147,7 @@ export default function ResultsScreen({ route, navigation }: Props)
                 setLoading(false);
             }
         }
-    }, [latitude, longitude, intent]);
+    }, [latitude, longitude, intent, isWaitingForSearchArea]);
 
     useEffect(() =>
     {
@@ -154,10 +195,33 @@ export default function ResultsScreen({ route, navigation }: Props)
         ? `Cafés para ${intentOption.description}`
         : 'Cafés cerca de vos';
 
+    /*
+     * El server mide la distancia desde el punto de búsqueda. Con una zona
+     * elegida ese punto es el centro de la zona, no el usuario: la
+     * recalculamos desde su ubicación real, o la ocultamos si no la hay.
+     */
+    const searchesInZone =
+        followsSearchArea && searchLocation.mode === 'zone';
+
+    const cafesWithDistance = useMemo(() =>
+    {
+        if (!searchesInZone)
+        {
+            return cafes;
+        }
+
+        return cafes.map((cafe) => ({
+            ...cafe,
+            distanceKm: userLocation
+                ? calculateDistanceKm(userLocation, cafe)
+                : null,
+        }));
+    }, [cafes, searchesInZone, userLocation]);
+
     const sortedCafes = useMemo(() =>
     {
-        return sortCafes(cafes, sortBy);
-    }, [cafes, sortBy]);
+        return sortCafes(cafesWithDistance, sortBy);
+    }, [cafesWithDistance, sortBy]);
 
     return (
         <SafeAreaView
@@ -169,6 +233,25 @@ export default function ResultsScreen({ route, navigation }: Props)
                 <Text style={styles.subtitle}>
                     Encontrá la cafetería ideal para tu momento.
                 </Text>
+                {followsSearchArea && (
+                    <TouchableOpacity
+                        style={styles.zoneBanner}
+                        onPress={() => navigation.navigate('ChooseZone')}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Buscando en ${searchLocation.label}. Cambiar zona`}
+                    >
+                        <Ionicons
+                            name="location"
+                            size={15}
+                            color="#6B3A22"
+                        />
+                        <Text style={styles.zoneBannerText} numberOfLines={1}>
+                            {searchLocation.label}
+                        </Text>
+                        <Text style={styles.zoneBannerAction}>Cambiar zona</Text>
+                    </TouchableOpacity>
+                )}
+
             </View>
 
             <View style={styles.sortContainer}>
@@ -200,6 +283,21 @@ export default function ResultsScreen({ route, navigation }: Props)
                 }}
                 scrollEventThrottle={16}
             >
+                {latitude === undefined && !isWaitingForSearchArea && (
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyTitle}>¿Dónde buscamos?</Text>
+                        <Text style={styles.emptyText}>
+                            Activá la ubicación o elegí una zona para ver cafeterías.
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.chooseZoneButton}
+                            onPress={() => navigation.navigate('ChooseZone')}
+                        >
+                            <Text style={styles.chooseZoneButtonText}>Elegir zona</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 {loading && cafes.length === 0 && (
                     <Text style={styles.message}>
                         Buscando cafeterías...
@@ -217,7 +315,7 @@ export default function ResultsScreen({ route, navigation }: Props)
                     </TouchableOpacity>
                 )}
 
-                {!loading && !error && cafes.length === 0 && (
+                {!loading && !error && cafes.length === 0 && latitude !== undefined && (
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyTitle}>
                             Todavía no encontramos cafeterías
@@ -368,4 +466,44 @@ const styles = StyleSheet.create({
         color: '#F8E6CF',
         fontSize: 17,
     },
+
+    zoneBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+        backgroundColor: '#FFFFFF',
+    },
+
+    zoneBannerText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#4A2416',
+    },
+
+    zoneBannerAction: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#6B3A22',
+    },
+
+    chooseZoneButton: {
+        marginTop: 16,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: '#6B3A22',
+    },
+
+    chooseZoneButtonText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+
 });
