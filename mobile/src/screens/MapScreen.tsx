@@ -35,6 +35,7 @@ import {
     MainTabParamList,
     RootStackParamlist,
 } from '../navigation/AppNavigator';
+import { getOpenStatus } from '../utils/openStatus';
 
 
 type MapPoint = { x: number; y: number };
@@ -175,6 +176,10 @@ export default function MapScreen(
     const selectedCafe = displayedCafes.find(
         cafe => cafe.googlePlaceId === selectedCafeId
     ) ?? null;
+
+    const selectedCafeStatus = selectedCafe
+        ? getOpenStatus(selectedCafe.isOpen)
+        : null;
 
     const sortedCafes = [...displayedCafes].sort((a, b) => {
         if (a.distanceKm === null && b.distanceKm === null)
@@ -714,6 +719,16 @@ export default function MapScreen(
                                 <Text style={styles.popupAddress} numberOfLines={1}>
                                     📍 {selectedCafe.shortAddress}
                                 </Text>
+                                {selectedCafeStatus && (
+                                    <Text
+                                        style={[
+                                            styles.popupStatus,
+                                            { color: selectedCafeStatus.color },
+                                        ]}
+                                    >
+                                        ● {selectedCafeStatus.label}
+                                    </Text>
+                                )}
                                 <View style={styles.popupDivider} />
                                 <View style={styles.popupRatingRow}>
                                     <View style={styles.popupRatingColumn}>
@@ -884,11 +899,27 @@ export default function MapScreen(
                                         </Text>
                                     </View>
 
-                                    <Text style={styles.cafeDistance}>
-                                        {cafe.distanceKm !== null
-                                            ? `${cafe.distanceKm.toFixed(1)} km`
-                                            : '—'}
-                                    </Text>
+                                    <View style={styles.cafeSideInfo}>
+                                        <Text style={styles.cafeDistance}>
+                                            {cafe.distanceKm !== null
+                                                ? `${cafe.distanceKm.toFixed(1)} km`
+                                                : '—'}
+                                        </Text>
+                                        {(() => {
+                                            const status = getOpenStatus(cafe.isOpen);
+
+                                            return status && (
+                                                <Text
+                                                    style={[
+                                                        styles.cafeStatus,
+                                                        { color: status.color },
+                                                    ]}
+                                                >
+                                                    {status.label}
+                                                </Text>
+                                            );
+                                        })()}
+                                    </View>
                                 </TouchableOpacity>
                             )}
                         />
@@ -979,6 +1010,7 @@ const styles = StyleSheet.create({
     },
     popupCoffee: { fontSize: 17, marginLeft: 8 },
     popupAddress: { marginTop: 5, color: '#7A6254', fontSize: 12 },
+    popupStatus: { marginTop: 4, fontSize: 12, fontWeight: '700' },
     popupDivider: {
         height: 1,
         backgroundColor: '#E8D9C7',
@@ -1080,6 +1112,16 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#6B3A22',
+    },
+
+    cafeSideInfo: {
+        alignItems: 'flex-end',
+        gap: 2,
+    },
+
+    cafeStatus: {
+        fontSize: 12,
+        fontWeight: '700',
     },
 
     locationCard: {
