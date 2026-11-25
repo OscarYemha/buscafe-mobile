@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { cafeIntents } from '../data/cafeIntents';
 import NearbyCafeCard from '../components/NearbyCafeCard';
@@ -241,11 +242,21 @@ export default function HomeScreen({navigation}: Props) {
                 }}
               >
                 <Text style={styles.locationButtonText}>
+                  <Ionicons
+                    name={
+                      locationServicesDisabled || canAskLocationAgain
+                        ? 'location'
+                        : 'settings'
+                    }
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                  {'  '}
                   {locationServicesDisabled
-                    ? '📍 Activar ubicación'
+                    ? 'Activar ubicación'
                     : canAskLocationAgain
-                      ? '📍 Usar mi ubicación'
-                      : '⚙️ Abrir ajustes'}
+                      ? 'Usar mi ubicación'
+                      : 'Abrir ajustes'}
                 </Text>
               </TouchableOpacity>
             </View>

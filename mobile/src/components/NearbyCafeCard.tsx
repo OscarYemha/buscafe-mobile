@@ -89,7 +89,7 @@ export default function NearbyCafeCard({
                 <Text style={styles.rating}>
                     {cafe.googleRating !== null
                         ? `Google ★ ${cafe.googleRating}`
-                        : 'Google · Sin valoración'}
+                        : 'Google · Sin valoraciones'}
                 </Text>
 
                 <Text style={styles.buscafeRating}>

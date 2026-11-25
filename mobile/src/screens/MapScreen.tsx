@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { formatDistance } from '../utils/distance';
+import { Ionicons } from '@expo/vector-icons';
 import {
     useCallback,
     useEffect,
@@ -495,11 +497,21 @@ export default function MapScreen(
                                     styles.locationButtonText
                                 }
                             >
+                                <Ionicons
+                                    name={
+                                        locationServicesDisabled || canAskLocationAgain
+                                            ? 'location'
+                                            : 'settings'
+                                    }
+                                    size={16}
+                                    color="#FFFFFF"
+                                />
+                                {'  '}
                                 {locationServicesDisabled
-                                    ? '📍 Activar ubicación'
+                                    ? 'Activar ubicación'
                                     : canAskLocationAgain
-                                        ? '📍 Usar mi ubicación'
-                                        : '⚙️ Abrir ajustes'}
+                                        ? 'Usar mi ubicación'
+                                        : 'Abrir ajustes'}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -714,10 +726,16 @@ export default function MapScreen(
                                     <Text style={styles.popupTitle} numberOfLines={2}>
                                         {selectedCafe.name}
                                     </Text>
-                                    <Text style={styles.popupCoffee}>☕</Text>
+                                    <Ionicons
+                                        name="cafe"
+                                        size={18}
+                                        color="#6B3A22"
+                                        style={styles.popupCoffee}
+                                    />
                                 </View>
                                 <Text style={styles.popupAddress} numberOfLines={1}>
-                                    📍 {selectedCafe.shortAddress}
+                                    <Ionicons name="location" size={12} color="#7A6254" />
+                                    {' '}{selectedCafe.shortAddress}
                                 </Text>
                                 {selectedCafeStatus && (
                                     <Text
@@ -736,7 +754,7 @@ export default function MapScreen(
                                         <Text style={styles.popupRatingValue}>
                                             ★ {selectedCafe.googleRating !== null
                                                 ? selectedCafe.googleRating.toFixed(1)
-                                                : 'Sin puntuación'}
+                                                : 'Sin valoraciones'}
                                         </Text>
                                     </View>
                                     <View style={styles.popupRatingColumn}>
@@ -744,7 +762,7 @@ export default function MapScreen(
                                         <Text style={styles.popupRatingValue}>
                                             {selectedCafe.buscafeRating !== null
                                                 ? `★ ${selectedCafe.buscafeRating.toFixed(1)}`
-                                                : 'Sin puntuación'}
+                                                : 'Sin valoraciones'}
                                         </Text>
                                     </View>
                                     <Text style={styles.popupChevron}>›</Text>
@@ -763,9 +781,7 @@ export default function MapScreen(
                             onPress={returnToMyLocation}
                             accessibilityLabel="Volver a mi ubicación"
                         >
-                            <Text style={styles.recenterButtonText}>
-                                🎯
-                            </Text>
+                            <Ionicons name="locate" size={24} color="#6B3A22" />
                         </TouchableOpacity>
                     </View>
                     {showSearchAreaButton && !explorationLoading && !selectedCafe && (
@@ -890,19 +906,19 @@ export default function MapScreen(
                                             Google ★{' '}
                                             {cafe.googleRating !== null
                                                 ? cafe.googleRating.toFixed(1)
-                                                : 'Sin reseñas'}
+                                                : 'Sin valoraciones'}
                                             {'   ·   '}
                                             BusCafé ★{' '}
                                             {cafe.buscafeRating !== null
                                                 ? cafe.buscafeRating.toFixed(1)
-                                                : 'Sin reseñas'}
+                                                : 'Sin valoraciones'}
                                         </Text>
                                     </View>
 
                                     <View style={styles.cafeSideInfo}>
                                         <Text style={styles.cafeDistance}>
                                             {cafe.distanceKm !== null
-                                                ? `${cafe.distanceKm.toFixed(1)} km`
+                                                ? formatDistance(cafe.distanceKm)
                                                 : '—'}
                                         </Text>
                                         {(() => {
@@ -1008,7 +1024,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#4A2416',
     },
-    popupCoffee: { fontSize: 17, marginLeft: 8 },
+    popupCoffee: { marginLeft: 8 },
     popupAddress: { marginTop: 5, color: '#7A6254', fontSize: 12 },
     popupStatus: { marginTop: 4, fontSize: 12, fontWeight: '700' },
     popupDivider: {
@@ -1190,9 +1206,6 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
 
-    recenterButtonText: {
-        fontSize: 23,
-    },
 
     explorationStatus: {
         position: 'absolute',
