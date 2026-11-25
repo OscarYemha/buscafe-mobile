@@ -2,6 +2,8 @@ import * as Location from 'expo-location';
 
 const LOCATION_TIMEOUT_MS = 10000;
 const LAST_KNOWN_MAX_AGE_MS = 10 * 60 * 1000;
+// Leer la última posición es casi instantáneo cuando funciona.
+const LAST_KNOWN_TIMEOUT_MS = 3000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T>
 {
@@ -91,9 +93,14 @@ export async function getCurrentLocation(
   }
   catch (error)
   {
-    location = await Location.getLastKnownPositionAsync({
-      maxAge: LAST_KNOWN_MAX_AGE_MS,
-    });
+    // También con timeout: si Google Play Services no responde (por ejemplo,
+    // desactivado), esta llamada puede quedar colgada para siempre.
+    location = await withTimeout(
+      Location.getLastKnownPositionAsync({
+        maxAge: LAST_KNOWN_MAX_AGE_MS,
+      }),
+      LAST_KNOWN_TIMEOUT_MS
+    ).catch(() => null);
 
     if (!location)
     {
