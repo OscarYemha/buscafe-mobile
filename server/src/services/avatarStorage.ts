@@ -10,9 +10,21 @@ import { supabase } from '../lib/supabase.js';
  * registra, pero no rompe el cambio de perfil ni el borrado de la cuenta.
  */
 
-export const AVATAR_BUCKET = 'avatars';
+const DEFAULT_AVATAR_BUCKET = 'avatars';
 
-const PUBLIC_PATH_MARKER = `/object/public/${AVATAR_BUCKET}/`;
+/**
+ * Bucket de las fotos. Producción usa `avatars` (sin la variable). En local
+ * hay que poner AVATAR_BUCKET=avatars-dev: el server local usa el mismo
+ * proyecto de Supabase que producción pero con la base local, y los IDs de
+ * usuario no coinciden; con el mismo bucket, borrar una cuenta de prueba
+ * borraría las fotos del usuario de producción con ese ID.
+ */
+export function getAvatarBucket(): string
+{
+    return process.env.AVATAR_BUCKET?.trim() || DEFAULT_AVATAR_BUCKET;
+}
+
+const publicPathMarker = (): string => `/object/public/${getAvatarBucket()}/`;
 const LIST_PAGE_SIZE = 100;
 
 export const userAvatarFolder = (userId: number): string =>
@@ -33,7 +45,8 @@ export function avatarPathFromUrl(
         return null;
     }
 
-    const markerIndex = url.indexOf(PUBLIC_PATH_MARKER);
+    const marker = publicPathMarker();
+    const markerIndex = url.indexOf(marker);
 
     if (markerIndex === -1)
     {
@@ -41,7 +54,7 @@ export function avatarPathFromUrl(
     }
 
     const path = decodeURIComponent(
-        url.slice(markerIndex + PUBLIC_PATH_MARKER.length).split('?')[0] ?? ''
+        url.slice(markerIndex + marker.length).split('?')[0] ?? ''
     );
 
     return path.startsWith(`${userAvatarFolder(userId)}/`) && !path.includes('..')
@@ -64,7 +77,7 @@ export async function deletePreviousAvatar(
     }
 
     const { error } = await supabase.storage
-        .from(AVATAR_BUCKET)
+        .from(getAvatarBucket())
         .remove([previousPath]);
 
     if (error)
@@ -85,7 +98,7 @@ export async function deleteAllUserAvatars(userId: number): Promise<void>
         for (;;)
         {
             const { data, error: listError } = await supabase.storage
-                .from(AVATAR_BUCKET)
+                .from(getAvatarBucket())
                 .list(folder, { limit: LIST_PAGE_SIZE });
 
             if (listError)
@@ -102,7 +115,7 @@ export async function deleteAllUserAvatars(userId: number): Promise<void>
             }
 
             const { error: removeError } = await supabase.storage
-                .from(AVATAR_BUCKET)
+                .from(getAvatarBucket())
                 .remove(paths);
 
             if (removeError)
@@ -121,4 +134,26 @@ export async function deleteAllUserAvatars(userId: number): Promise<void>
     {
         console.error('Error al borrar las fotos del usuario:', error);
     }
+}
+
+/**
+ * Aviso al arrancar si la base es local pero el bucket es el de producción
+ * (ver getAvatarBucket). Devuelve true si avisó.
+ */
+export function warnIfLocalDatabaseUsesProductionBucket(): boolean
+{
+    const databaseUrl = process.env.DATABASE_URL ?? '';
+    const isLocalDatabase = /@(localhost|127\.0\.0\.1)[:/]/.test(databaseUrl);
+
+    if (isLocalDatabase && getAvatarBucket() === DEFAULT_AVATAR_BUCKET)
+    {
+        console.warn(
+            '⚠️  La base es local pero las fotos van al bucket de producción ' +
+            `("${DEFAULT_AVATAR_BUCKET}"). Poné AVATAR_BUCKET=avatars-dev en server/.env.`
+        );
+
+        return true;
+    }
+
+    return false;
 }

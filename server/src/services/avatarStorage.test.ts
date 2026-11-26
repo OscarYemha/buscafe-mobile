@@ -5,14 +5,18 @@ const bucket = vi.hoisted(() => ({
     remove: vi.fn(),
 }));
 
+const from = vi.hoisted(() => vi.fn());
+
 vi.mock('../lib/supabase.js', () => ({
-    supabase: { storage: { from: vi.fn(() => bucket) } },
+    supabase: { storage: { from } },
 }));
 
 import {
     avatarPathFromUrl,
     deleteAllUserAvatars,
     deletePreviousAvatar,
+    getAvatarBucket,
+    warnIfLocalDatabaseUsesProductionBucket,
 } from './avatarStorage.js';
 
 const PUBLIC = 'https://abc.supabase.co/storage/v1/object/public/avatars';
@@ -20,6 +24,8 @@ const PUBLIC = 'https://abc.supabase.co/storage/v1/object/public/avatars';
 beforeEach(() =>
 {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    from.mockReturnValue(bucket);
     bucket.remove.mockResolvedValue({ error: null });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -128,5 +134,57 @@ describe('deleteAllUserAvatars', () =>
         bucket.remove.mockResolvedValue({ error: new Error('no se pudo') });
         await expect(deleteAllUserAvatars(7)).resolves.toBeUndefined();
         expect(bucket.remove).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('bucket configurable (local separado de producción)', () =>
+{
+    const DEV = 'https://abc.supabase.co/storage/v1/object/public/avatars-dev';
+
+    it('sin AVATAR_BUCKET usa el de producción', () =>
+    {
+        vi.stubEnv('AVATAR_BUCKET', '');
+
+        expect(getAvatarBucket()).toBe('avatars');
+    });
+
+    it('con AVATAR_BUCKET usa ese bucket para borrar', async () =>
+    {
+        vi.stubEnv('AVATAR_BUCKET', 'avatars-dev');
+
+        await deletePreviousAvatar(7, `${DEV}/users/7/vieja.jpg`, 'users/7/nueva.jpg');
+
+        expect(from).toHaveBeenCalledWith('avatars-dev');
+        expect(bucket.remove).toHaveBeenCalledWith(['users/7/vieja.jpg']);
+    });
+
+    // Desde local nunca se borra una foto de producción, aunque su URL haya
+    // quedado guardada en la base local.
+    it('en local no reconoce como propias las URLs del bucket de producción', async () =>
+    {
+        vi.stubEnv('AVATAR_BUCKET', 'avatars-dev');
+
+        expect(avatarPathFromUrl(`${PUBLIC}/users/7/avatar.jpg`, 7)).toBeNull();
+
+        await deletePreviousAvatar(7, `${PUBLIC}/users/7/avatar.jpg`, 'users/7/nueva.jpg');
+        expect(bucket.remove).not.toHaveBeenCalled();
+    });
+
+    it('avisa al arrancar si la base es local y el bucket es el de producción', () =>
+    {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        vi.stubEnv('DATABASE_URL', 'postgresql://u:p@localhost:5432/buscafe');
+        vi.stubEnv('AVATAR_BUCKET', '');
+        expect(warnIfLocalDatabaseUsesProductionBucket()).toBe(true);
+
+        vi.stubEnv('AVATAR_BUCKET', 'avatars-dev');
+        expect(warnIfLocalDatabaseUsesProductionBucket()).toBe(false);
+
+        vi.stubEnv('DATABASE_URL', 'postgresql://u:p@aws-0.pooler.supabase.com:5432/postgres');
+        vi.stubEnv('AVATAR_BUCKET', '');
+        expect(warnIfLocalDatabaseUsesProductionBucket()).toBe(false);
+
+        expect(warn).toHaveBeenCalledTimes(1);
     });
 });
