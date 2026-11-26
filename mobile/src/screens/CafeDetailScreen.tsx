@@ -654,7 +654,7 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                     }}
                 >
                     <Text style={styles.directionsButtonText}>
-                        <Ionicons name="navigate" size={16} color="#FFFFFF" />
+                        <Ionicons name="location" size={16} color="#FFFFFF" />
                         {'  '}Cómo llegar
                     </Text>
                 </TouchableOpacity>
