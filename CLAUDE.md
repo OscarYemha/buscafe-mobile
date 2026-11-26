@@ -30,6 +30,9 @@ bajarlo con `expo install --fix`.
   con el bucket de producción (`avatars`), borrar una cuenta de prueba
   borraría las fotos del usuario real con el mismo ID. El server avisa al
   arrancar si falta.
+- Fotos huérfanas en producción: `npx tsx scripts/clean-orphan-avatars.ts`
+  en server/ con PROD_DATABASE_URL (solo lista; `--apply` borra). Se
+  corrió el 2026-11-26: borró 6 archivos y quedó solo la foto actual.
 
 ## APK y actualizaciones (EAS)
 - APK: `npx eas-cli build -p android --profile preview` (gasta un build del
@@ -62,10 +65,6 @@ si llega el aviso, reactivarlo en Actions.
 - Actualizar a Expo SDK 58 (tarea aparte; el APK actual ya está validado).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.
-- Fotos huérfanas en producción (Supabase, bucket avatars): las que
-  dejaron los cambios de foto y las cuentas borradas antes del arreglo
-  de DELETE /users/me. Limpiar con un script de una sola vez (toca datos
-  reales: revisar con Oscar antes de correrlo).
 - Antes de una prueba con otras personas: dominio propio verificado en
   Resend (hoy los mails salen de onboarding@resend.dev y solo le llegan
   al dueño de la cuenta), alertas de presupuesto en Google Cloud y ver si
