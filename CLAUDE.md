@@ -25,6 +25,11 @@ bajarlo con `expo install --fix`.
   `npx prisma migrate deploy --config prisma7.config.ts`; a producción
   las aplica Oscar durante el deploy.
 - Si Postgres no responde (ECONNREFUSED): `sudo systemctl start postgresql`.
+- Storage: el server local usa el mismo proyecto de Supabase que
+  producción. En server/.env tiene que estar `AVATAR_BUCKET=avatars-dev`:
+  con el bucket de producción (`avatars`), borrar una cuenta de prueba
+  borraría las fotos del usuario real con el mismo ID. El server avisa al
+  arrancar si falta.
 
 ## APK y actualizaciones (EAS)
 - APK: `npx eas-cli build -p android --profile preview` (gasta un build del
