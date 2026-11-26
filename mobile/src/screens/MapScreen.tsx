@@ -55,6 +55,16 @@ const SEARCH_AREA_MIN_MOVEMENT = 0.30;
 const SEARCH_AREA_MIN_ZOOM_CHANGE = 0.35;
 const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 
+/*
+ * Al seleccionar un café el mapa se centra con el pin más abajo (a un 70 %
+ * de la altura), para dejar lugar arriba a la tarjeta. Si igual no entra
+ * arriba, la tarjeta se muestra debajo del pin en vez de ocultarse.
+ */
+const SELECTED_CAFE_DELTA = 0.01;
+const SELECTED_PIN_OFFSET = 0.2; // fracción de la altura bajo el centro
+const POPUP_EDGE_MARGIN = 12;
+const POPUP_BELOW_GAP = 10;
+
 // Proyección de Mercator para acompañar el gesto sin esperar al puente nativo.
 function mercatorY(latitude: number): number
 {
@@ -219,19 +229,17 @@ export default function MapScreen(
                 360 - longitudeDifference
             ) / reference.longitudeDelta;
 
-        const zoomChange = Math.max(
-            Math.abs(
-                current.latitudeDelta / reference.latitudeDelta - 1
-            ),
-            Math.abs(
-                current.longitudeDelta / reference.longitudeDelta - 1
-            )
+        // Solo cuenta alejarse (ver más área). Acercarse no muestra lugares
+        // nuevos: lo que se ve ya está cubierto por la búsqueda.
+        const zoomOut = Math.max(
+            current.latitudeDelta / reference.latitudeDelta - 1,
+            current.longitudeDelta / reference.longitudeDelta - 1
         );
 
         return (
             latitudeMovement >= SEARCH_AREA_MIN_MOVEMENT ||
             longitudeMovement >= SEARCH_AREA_MIN_MOVEMENT ||
-            zoomChange >= SEARCH_AREA_MIN_ZOOM_CHANGE
+            zoomOut >= SEARCH_AREA_MIN_ZOOM_CHANGE
         );
     }
 
@@ -416,6 +424,18 @@ export default function MapScreen(
         );
     }
 
+    const popupFitsAbove =
+        popupPoint !== null &&
+        popupPoint.y - PIN_VERTICAL_OFFSET - popupHeight >= POPUP_EDGE_MARGIN;
+
+    const popupFitsBelow =
+        popupPoint !== null &&
+        popupPoint.y + POPUP_BELOW_GAP + popupHeight <=
+            mapSize.height - POPUP_EDGE_MARGIN;
+
+    const popupPlacement: 'above' | 'below' =
+        popupFitsAbove ? 'above' : 'below';
+
     const isPopupVisible =
         selectedCafe !== null &&
         popupPoint !== null &&
@@ -424,7 +444,7 @@ export default function MapScreen(
         popupPoint.x >= 0 &&
         popupPoint.x <= mapSize.width &&
         popupPoint.y <= mapSize.height &&
-        popupPoint.y - PIN_VERTICAL_OFFSET - popupHeight >= 12;
+        (popupFitsAbove || popupFitsBelow);
 
     useEffect(() => {
         if (!userLocation || searchReferenceRegionRef.current) {
@@ -659,9 +679,10 @@ export default function MapScreen(
 
                                 mapRef.current?.animateToRegion(
                                     {
-                                        latitude: cafe.latitude,
+                                        latitude: cafe.latitude +
+                                            SELECTED_CAFE_DELTA * SELECTED_PIN_OFFSET,
                                         longitude: cafe.longitude,
-                                        latitudeDelta: 0.01,
+                                        latitudeDelta: SELECTED_CAFE_DELTA,
                                         longitudeDelta: 0.01,
                                     },
                                     350
@@ -700,8 +721,14 @@ export default function MapScreen(
                                 styles.popupAnchor,
                                 {
                                     left: popupPoint.x - CARD_WIDTH / 2,
-                                    top: popupPoint.y - PIN_VERTICAL_OFFSET,
-                                    transform: [{ translateY: -popupHeight }],
+                                    ...(popupPlacement === 'above'
+                                        ? {
+                                            top: popupPoint.y - PIN_VERTICAL_OFFSET,
+                                            transform: [{ translateY: -popupHeight }],
+                                        }
+                                        : {
+                                            top: popupPoint.y + POPUP_BELOW_GAP,
+                                        }),
                                     opacity: isPopupVisible ? 1 : 0,
                                 },
                             ]}
@@ -713,6 +740,9 @@ export default function MapScreen(
                                 }
                             }}
                         >
+                            {popupPlacement === 'below' && (
+                                <View style={styles.popupTailUp} />
+                            )}
                             <TouchableOpacity
                                 activeOpacity={0.9}
                                 accessibilityRole="button"
@@ -768,7 +798,9 @@ export default function MapScreen(
                                     <Text style={styles.popupChevron}>›</Text>
                                 </View>
                             </TouchableOpacity>
-                            <View style={styles.popupTail} />
+                            {popupPlacement === 'above' && (
+                                <View style={styles.popupTail} />
+                            )}
                         </View>
                     )}
 
@@ -881,9 +913,10 @@ export default function MapScreen(
 
                                         mapRef.current?.animateToRegion(
                                             {
-                                                latitude: cafe.latitude,
+                                                latitude: cafe.latitude +
+                                                    SELECTED_CAFE_DELTA * SELECTED_PIN_OFFSET,
                                                 longitude: cafe.longitude,
-                                                latitudeDelta: 0.01,
+                                                latitudeDelta: SELECTED_CAFE_DELTA,
                                                 longitudeDelta: 0.01,
                                             },
                                             350
@@ -1055,6 +1088,16 @@ const styles = StyleSheet.create({
         transform: [{ rotate: '45deg' }],
         marginTop: -7,
     },
+    popupTailUp: {
+        width: 12,
+        height: 12,
+        backgroundColor: '#FFFFFF',
+        borderLeftWidth: 1,
+        borderTopWidth: 1,
+        borderColor: '#E8D9C7',
+        transform: [{ rotate: '45deg' }],
+        marginBottom: -7,
+    },
 
     selectedCafeName: {
         fontSize: 15,
@@ -1179,10 +1222,9 @@ const styles = StyleSheet.create({
     },
 
     searchAreaButton: {
-        alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
         borderRadius: 24,
         borderWidth: 1,
         borderColor: '#E8D9C7',
@@ -1192,7 +1234,7 @@ const styles = StyleSheet.create({
     searchAreaButtonText: {
         color: '#4A2416',
         fontWeight: '700',
-        fontSize: 14,
+        fontSize: 13,
     },
 
     recenterButton: {
@@ -1234,8 +1276,7 @@ const styles = StyleSheet.create({
     searchAreaContainer: {
         position: 'absolute',
         top: 70,
-        left: 20,
-        right: 20,
+        alignSelf: 'center',
         zIndex: 15,
     },
 });
