@@ -24,7 +24,7 @@ export function getAvatarBucket(): string
     return process.env.AVATAR_BUCKET?.trim() || DEFAULT_AVATAR_BUCKET;
 }
 
-const publicPathMarker = (): string => `/object/public/${getAvatarBucket()}/`;
+const publicPathMarker = (bucket: string): string => `/object/public/${bucket}/`;
 const LIST_PAGE_SIZE = 100;
 
 export const userAvatarFolder = (userId: number): string =>
@@ -37,7 +37,8 @@ export const userAvatarFolder = (userId: number): string =>
  */
 export function avatarPathFromUrl(
     url: string | null | undefined,
-    userId: number
+    userId: number,
+    bucket: string = getAvatarBucket()
 ): string | null
 {
     if (!url)
@@ -45,7 +46,7 @@ export function avatarPathFromUrl(
         return null;
     }
 
-    const marker = publicPathMarker();
+    const marker = publicPathMarker(bucket);
     const markerIndex = url.indexOf(marker);
 
     if (markerIndex === -1)
