@@ -61,6 +61,9 @@ const SEARCH_AREA_BUTTON_DELAY_MS = 700;
  * arriba, la tarjeta se muestra debajo del pin en vez de ocultarse.
  */
 const SELECTED_CAFE_DELTA = 0.01;
+
+const RECENTER_BUTTON_SIZE = 46;
+const RECENTER_BUTTON_MARGIN = 16;
 const SELECTED_PIN_OFFSET = 0.2; // fracción de la altura bajo el centro
 const POPUP_EDGE_MARGIN = 12;
 const POPUP_BELOW_GAP = 10;
@@ -608,6 +611,9 @@ export default function MapScreen(
                         showsUserLocation
                         showsMyLocationButton={false}
                         toolbarEnabled={false}
+                        // Los +/- de Google irían abajo a la derecha, donde está
+                        // el botón de recentrar. El zoom se hace con dos dedos.
+                        zoomControlEnabled={false}
                         onPress={(event) => {
                             if (event.nativeEvent.action === 'marker-press') {
                                 return;
@@ -877,14 +883,26 @@ export default function MapScreen(
                             </Text>
                         </TouchableOpacity>
 
+                    </View>
+
+                    {/* Abajo a la derecha del mapa (no de la pantalla: la lista
+                        está en el mismo contenedor), como en Google Maps. */}
+                    {mapSize.height > 0 && (
                         <TouchableOpacity
-                            style={styles.recenterButton}
+                            style={[
+                                styles.recenterButton,
+                                {
+                                    top: mapSize.height -
+                                        RECENTER_BUTTON_SIZE -
+                                        RECENTER_BUTTON_MARGIN,
+                                },
+                            ]}
                             onPress={returnToMyLocation}
                             accessibilityLabel="Volver a mi ubicación"
                         >
                             <Ionicons name="locate" size={24} color="#6B3A22" />
                         </TouchableOpacity>
-                    </View>
+                    )}
                     {showSearchAreaButton && !explorationLoading && !selectedCafe && (
                         <View
                             style={styles.searchAreaContainer}
@@ -1328,11 +1346,13 @@ const styles = StyleSheet.create({
     },
 
     recenterButton: {
-        marginLeft: 'auto',
+        position: 'absolute',
+        right: 12,
+        zIndex: 20,
         backgroundColor: '#FFFFFF',
-        width: 46,
-        height: 46,
-        borderRadius: 23,
+        width: RECENTER_BUTTON_SIZE,
+        height: RECENTER_BUTTON_SIZE,
+        borderRadius: RECENTER_BUTTON_SIZE / 2,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 4,
