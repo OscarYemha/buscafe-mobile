@@ -121,6 +121,10 @@ export default function MapScreen(
     const [exploredRegion, setExploredRegion] = useState<Region | null>(null);
     const [showSearchAreaButton, setShowSearchAreaButton] = useState(false);
 
+    // "Abiertos ahora": muestra solo los cafés que Google marca como abiertos
+    // (los sin horario conocido también se ocultan).
+    const [showOnlyOpen, setShowOnlyOpen] = useState(false);
+
     const searchAreaTimerRef =
         useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -202,7 +206,32 @@ export default function MapScreen(
         }, [])
     );
 
-    const displayedCafes = explorationCafes ?? cafes;
+    const allCafes = explorationCafes ?? cafes;
+
+    const displayedCafes = showOnlyOpen
+        ? allCafes.filter((cafe) => cafe.isOpen === true)
+        : allCafes;
+
+    function toggleShowOnlyOpen()
+    {
+        const next = !showOnlyOpen;
+
+        // Si el café seleccionado queda oculto, se deselecciona.
+        if (next && selectedCafeId)
+        {
+            const selected = allCafes.find(
+                (cafe) => cafe.googlePlaceId === selectedCafeId
+            );
+
+            if (selected?.isOpen !== true)
+            {
+                setSelectedCafeId(null);
+                setPopupPoint(null);
+            }
+        }
+
+        setShowOnlyOpen(next);
+    }
 
     const selectedCafe = displayedCafes.find(
         cafe => cafe.googlePlaceId === selectedCafeId
@@ -483,16 +512,6 @@ export default function MapScreen(
             style={styles.container}
             edges={['left', 'right']}
         >
-            <View style={styles.header}>
-                <Text style={styles.title}>
-                    Mapa
-                </Text>
-
-                <Text style={styles.description}>
-                    Explorá cafeterías cerca de vos.
-                </Text>
-            </View>
-
             {loading && !userLocation && (
                 <View style={styles.center}>
                     <ActivityIndicator
@@ -834,6 +853,31 @@ export default function MapScreen(
                         pointerEvents="box-none"
                     >
                         <TouchableOpacity
+                            style={[
+                                styles.openNowChip,
+                                showOnlyOpen && styles.openNowChipActive,
+                            ]}
+                            onPress={toggleShowOnlyOpen}
+                            accessibilityRole="switch"
+                            accessibilityState={{ checked: showOnlyOpen }}
+                            accessibilityLabel="Mostrar solo cafés abiertos ahora"
+                        >
+                            <Ionicons
+                                name="time"
+                                size={16}
+                                color={showOnlyOpen ? '#FFFFFF' : '#6B3A22'}
+                            />
+                            <Text
+                                style={[
+                                    styles.openNowChipText,
+                                    showOnlyOpen && styles.openNowChipTextActive,
+                                ]}
+                            >
+                                Abiertos ahora
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                             style={styles.recenterButton}
                             onPress={returnToMyLocation}
                             accessibilityLabel="Volver a mi ubicación"
@@ -884,6 +928,13 @@ export default function MapScreen(
                         <FlatList
                             ref={listRef}
                             data={sortedCafes}
+                            ListEmptyComponent={
+                                showOnlyOpen && allCafes.length > 0 ? (
+                                    <Text style={styles.emptyListMessage}>
+                                        No hay cafés abiertos en esta zona.
+                                    </Text>
+                                ) : null
+                            }
                             onScrollToIndexFailed={(info) => {
                                 listRef.current?.scrollToOffset({
                                     offset:
@@ -1004,23 +1055,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8F1E7',
     },
 
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 5,
-        paddingBottom: 8,
-    },
 
-    title: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: '#4A2416',
-    },
 
-    description: {
-        marginTop: 6,
-        fontSize: 15,
-        color: '#7A6254',
-    },
 
     center: {
         flex: 1,
@@ -1254,6 +1290,41 @@ const styles = StyleSheet.create({
         color: '#4A2416',
         fontWeight: '700',
         fontSize: 13,
+    },
+
+    openNowChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
+        backgroundColor: '#FFFFFF',
+        elevation: 4,
+    },
+
+    openNowChipActive: {
+        backgroundColor: '#6B3A22',
+        borderColor: '#6B3A22',
+    },
+
+    openNowChipText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#6B3A22',
+    },
+
+    openNowChipTextActive: {
+        color: '#FFFFFF',
+    },
+
+    emptyListMessage: {
+        padding: 20,
+        textAlign: 'center',
+        fontSize: 14,
+        color: '#7A6254',
     },
 
     recenterButton: {
