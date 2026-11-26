@@ -170,9 +170,28 @@ export default function MapScreen(
     const [popupHeight, setPopupHeight] = useState(0);
     const [popupPoint, setPopupPoint] = useState<(MapPoint & { id: string }) | null>(null);
 
+    /*
+     * Al salir del mapa se limpia la selección (por ejemplo, al cambiar de
+     * pestaña), salvo que se haya ido al detalle de un café: al volver, el
+     * café sigue seleccionado y la lista en el mismo lugar.
+     */
+    const keepSelectionOnBlurRef = useRef(false);
+
+    function openCafeDetail(googlePlaceId: string)
+    {
+        keepSelectionOnBlurRef.current = true;
+        navigation.navigate('CafeDetail', { googlePlaceId });
+    }
+
     useFocusEffect(
         useCallback(() => {
             return () => {
+                if (keepSelectionOnBlurRef.current)
+                {
+                    keepSelectionOnBlurRef.current = false;
+                    return;
+                }
+
                 setSelectedCafeId(null);
 
                 listRef.current?.scrollToOffset({
@@ -651,7 +670,15 @@ export default function MapScreen(
 
                     {sortedCafes.map((cafe) => (
                         <Marker
-                            key={cafe.googlePlaceId}
+                            // La key cambia con la selección para recrear el
+                            // marcador: en Android, Google Maps no aplica un
+                            // zIndex nuevo a un marcador ya dibujado, y el pin
+                            // elegido desde la lista quedaba debajo del resto.
+                            key={
+                                selectedCafeId === cafe.googlePlaceId
+                                    ? `${cafe.googlePlaceId}-selected`
+                                    : cafe.googlePlaceId
+                            }
                             image={
                                 selectedCafeId === cafe.googlePlaceId
                                     ? require('../../assets/cafe-marker-selected.png')
@@ -748,9 +775,7 @@ export default function MapScreen(
                                 accessibilityRole="button"
                                 accessibilityLabel={`Ver detalles de ${selectedCafe.name}`}
                                 style={styles.popupCard}
-                                onPress={() => navigation.navigate('CafeDetail', {
-                                    googlePlaceId: selectedCafe.googlePlaceId,
-                                })}
+                                onPress={() => openCafeDetail(selectedCafe.googlePlaceId)}
                             >
                                 <View style={styles.popupTitleRow}>
                                     <Text style={styles.popupTitle} numberOfLines={2}>
@@ -894,13 +919,7 @@ export default function MapScreen(
                                             cafe.googlePlaceId
                                         )
                                         {
-                                            navigation.navigate(
-                                                'CafeDetail',
-                                                {
-                                                    googlePlaceId:
-                                                        cafe.googlePlaceId,
-                                                }
-                                            );
+                                            openCafeDetail(cafe.googlePlaceId);
 
                                             return;
                                         }
