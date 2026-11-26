@@ -14,7 +14,8 @@ bajarlo con `expo install --fix`.
   grandes o repetitivos (tests, refactors) los hacés vos.
 - Antes de cambios no triviales: proponé un plan y esperá mi OK.
 - Un commit por paso, mensajes estilo Conventional Commits en castellano.
-- Al terminar: `npm test` y `npm run build` en server/, `npx tsc --noEmit` en mobile/.
+- Al terminar: `npm test` y `npm run build` en server/; `npx tsc --noEmit`
+  y `npx jest` en mobile/ (no hay script `test` a propósito: ver jest.config.js).
 
 ## Base de datos: reglas estrictas
 - server/.env apunta a Postgres LOCAL (localhost:5432). Las URLs de
@@ -57,10 +58,7 @@ si llega el aviso, reactivarlo en Actions.
 - Actualizar a Expo SDK 58 (tarea aparte; el APK actual ya está validado).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.
-- Tests de mobile (no hay ninguno): instalar jest-expo y testear la
-  lógica (getCurrentLocation, manejo del 401, zona guardada, distancias,
-  ordenamiento). En server faltan tests de las rutas de cafés y de
-  editar perfil/avatar.
+- Tests: en server faltan los de las rutas de cafés y editar perfil/avatar.
 - Antes de una prueba con otras personas: dominio propio verificado en
   Resend (hoy los mails salen de onboarding@resend.dev y solo le llegan
   al dueño de la cuenta), alertas de presupuesto en Google Cloud y ver si
