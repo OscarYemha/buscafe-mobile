@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { RequestHandler, Router } from "express";
 import prisma from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import bcrypt from 'bcrypt';
@@ -20,6 +20,11 @@ import {
 import { createAuthRateLimiters } from '../middleware/rateLimit.js';
 import multer from 'multer';
 import { supabase } from '../lib/supabase.js';
+import {
+    AVATAR_BUCKET,
+    deleteAllUserAvatars,
+    deletePreviousAvatar,
+} from '../services/avatarStorage.js';
 import { randomUUID } from 'node:crypto';
 
 const router = Router();
@@ -47,9 +52,7 @@ const avatarUpload = multer({
             )
         )
         {
-            callback(
-                new Error('Formato de imagen no permitido')
-            );
+            callback(new InvalidImageFormatError());
 
             return;
         }
@@ -57,6 +60,49 @@ const avatarUpload = multer({
         callback(null, true);
     },
 });
+
+class InvalidImageFormatError extends Error
+{
+    constructor()
+    {
+        super('Formato de imagen no permitido. Usá JPG, PNG o WebP.');
+        this.name = 'InvalidImageFormatError';
+    }
+}
+
+/*
+ * Sube el archivo "avatar" a memoria. Un formato inválido o una imagen de
+ * más de 5 MB responden 400 con un mensaje claro (antes caían en el
+ * manejador genérico de Express como un 500).
+ */
+const receiveAvatar: RequestHandler = (req, res, next) =>
+{
+    avatarUpload.single('avatar')(req, res, (error: unknown) =>
+    {
+        if (!error)
+        {
+            next();
+            return;
+        }
+
+        if (error instanceof InvalidImageFormatError)
+        {
+            res.status(400).json({ error: error.message });
+            return;
+        }
+
+        if (
+            error instanceof multer.MulterError &&
+            error.code === 'LIMIT_FILE_SIZE'
+        )
+        {
+            res.status(400).json({ error: 'La imagen supera los 5 MB.' });
+            return;
+        }
+
+        next(error);
+    });
+};
 
 router.get(
     '/me',
@@ -367,34 +413,9 @@ router.delete(
                 },
             });
 
-            if (user.avatarUrl)
-            {
-                const avatarExtensions = [
-                    'jpg',
-                    'png',
-                    'webp',
-                ];
-
-                const avatarPaths =
-                    avatarExtensions.map(
-                        (extension) =>
-                            `users/${userId}/avatar.${extension}`
-                    );
-
-                const {
-                    error: avatarDeleteError,
-                } = await supabase.storage
-                    .from('avatars')
-                    .remove(avatarPaths);
-
-                if (avatarDeleteError)
-                {
-                    console.error(
-                        'No se pudo eliminar el avatar:',
-                        avatarDeleteError
-                    );
-                }
-            }
+            // Todas las fotos del usuario, no solo la actual: las subidas
+            // desde "editar perfil" tienen nombres al azar.
+            await deleteAllUserAvatars(userId);
 
             return res.json({
                 message:
@@ -675,7 +696,7 @@ router.post(
 router.patch(
     '/me/profile',
     requireAuth,
-    avatarUpload.single('avatar'),
+    receiveAvatar,
     async (
         req: AuthenticatedRequest,
         res
@@ -748,7 +769,7 @@ router.patch(
                 const {
                     error: uploadError,
                 } = await supabase.storage
-                    .from('avatars')
+                    .from(AVATAR_BUCKET)
                     .upload(
                         newAvatarPath,
                         file.buffer,
@@ -770,7 +791,7 @@ router.patch(
                 const {
                     data: publicUrlData,
                 } = supabase.storage
-                    .from('avatars')
+                    .from(AVATAR_BUCKET)
                     .getPublicUrl(newAvatarPath);
 
                 newAvatarUrl = publicUrlData.publicUrl;
@@ -795,6 +816,15 @@ router.patch(
                     },
                 });
 
+            if (newAvatarPath)
+            {
+                await deletePreviousAvatar(
+                    userId,
+                    previousUser.avatarUrl,
+                    newAvatarPath
+                );
+            }
+
             newAvatarPath = null;
 
             return res.json(updatedUser);
@@ -808,7 +838,7 @@ router.patch(
                 const {
                     error: cleanupError,
                 } = await supabase.storage
-                    .from('avatars')
+                    .from(AVATAR_BUCKET)
                     .remove([newAvatarPath]);
 
                 if (cleanupError)
@@ -830,7 +860,7 @@ router.patch(
 router.patch(
     '/me/avatar',
     requireAuth,
-    avatarUpload.single('avatar'),
+    receiveAvatar,
     async (
         req: AuthenticatedRequest,
         res
@@ -864,10 +894,16 @@ router.patch(
             const filePath =
                 `users/${userId}/avatar.${extension}`;
 
+            const previousUser =
+                await prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { avatarUrl: true },
+                });
+
             const {
                 error: uploadError,
             } = await supabase.storage
-                .from('avatars')
+                .from(AVATAR_BUCKET)
                 .upload(
                     filePath,
                     file.buffer,
@@ -889,7 +925,7 @@ router.patch(
             const {
                 data: publicUrlData,
             } = supabase.storage
-                .from('avatars')
+                .from(AVATAR_BUCKET)
                 .getPublicUrl(filePath);
 
             const avatarUrl =
@@ -910,6 +946,13 @@ router.patch(
                         avatarUrl: true,
                     },
                 });
+
+            // Si antes era avatar.jpg y ahora avatar.png, no dejar la vieja.
+            await deletePreviousAvatar(
+                userId,
+                previousUser?.avatarUrl,
+                filePath
+            );
 
             return res.json(user);
         }
