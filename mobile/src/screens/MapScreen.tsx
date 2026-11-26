@@ -333,15 +333,13 @@ export default function MapScreen(
         });
     }
 
+    // Al cambiar la selección, la tarjeta se ubica con la proyección real de
+    // Google (pointForCoordinate) y recién ahí se muestra: con la estimación
+    // previa aparecía corrida y se acomodaba después. Durante los gestos se
+    // sigue usando la estimación (updatePopupPosition) para que acompañe.
     useEffect(() => {
-        if (currentRegionRef.current)
-        {
-            updatePopupPosition(currentRegionRef.current, selectedCafe);
-        }
-        else
-        {
-            setPopupPoint(null);
-        }
+        setPopupPoint(null);
+        syncPopupWithNativeMap(selectedCafe);
     }, [selectedCafeId, mapSize.width, mapSize.height]);
 
     useEffect(() => {
@@ -611,6 +609,7 @@ export default function MapScreen(
                         showsUserLocation
                         showsMyLocationButton={false}
                         toolbarEnabled={false}
+                        moveOnMarkerPress={false}
                         // Los +/- de Google irían abajo a la derecha, donde está
                         // el botón de recentrar. El zoom se hace con dos dedos.
                         zoomControlEnabled={false}
@@ -722,23 +721,10 @@ export default function MapScreen(
                             {
                                 const cafeId = cafe.googlePlaceId;
 
+                                // Sin mover la cámara: la tarjeta aparece directamente
+                                // sobre el pin (antes seguía al pin durante el zoom).
+                                // La posición la calcula el efecto de selección.
                                 setSelectedCafeId(cafeId);
-                                if (currentRegionRef.current)
-                                {
-                                    updatePopupPosition(currentRegionRef.current, cafe);
-                                }
-                                programmaticMovementRef.current = true;
-
-                                mapRef.current?.animateToRegion(
-                                    {
-                                        latitude: cafe.latitude +
-                                            SELECTED_CAFE_DELTA * SELECTED_PIN_OFFSET,
-                                        longitude: cafe.longitude,
-                                        latitudeDelta: SELECTED_CAFE_DELTA,
-                                        longitudeDelta: 0.01,
-                                    },
-                                    350
-                                );
 
                                 requestAnimationFrame(() =>
                                 {
@@ -870,7 +856,7 @@ export default function MapScreen(
                         >
                             <Ionicons
                                 name="time"
-                                size={16}
+                                size={14}
                                 color={showOnlyOpen ? '#FFFFFF' : '#6B3A22'}
                             />
                             <Text
@@ -1289,7 +1275,7 @@ const styles = StyleSheet.create({
         left: 12,
         right: 12,
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         zIndex: 20,
     },
@@ -1313,10 +1299,10 @@ const styles = StyleSheet.create({
     openNowChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 20,
+        gap: 5,
+        paddingHorizontal: 11,
+        paddingVertical: 7,
+        borderRadius: 18,
         borderWidth: 1,
         borderColor: '#E8D9C7',
         backgroundColor: '#FFFFFF',
@@ -1329,7 +1315,7 @@ const styles = StyleSheet.create({
     },
 
     openNowChipText: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
         color: '#6B3A22',
     },
