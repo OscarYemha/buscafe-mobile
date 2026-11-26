@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     getPlaceDetails,
     GooglePlaceNotFoundError,
+    shouldShowPlace,
 } from './googlePlaces.js';
+import type { GooglePlace } from '../types/googlePlaces.js';
 
 const googleError = (code: number, status: string, message: string, reason?: string) =>
     JSON.stringify({
@@ -78,5 +80,44 @@ describe('getPlaceDetails: errores de Google', () =>
 
         expect(error).toBeInstanceOf(Error);
         expect(error).not.toBeInstanceOf(GooglePlaceNotFoundError);
+    });
+});
+
+describe('shouldShowPlace: qué lugares de Google se listan', () =>
+{
+    const cafe = (extra: Partial<GooglePlace> = {}): GooglePlace => ({
+        id: 'x',
+        displayName: { text: 'Café de la esquina' },
+        types: ['cafe', 'food', 'point_of_interest'],
+        primaryType: 'cafe',
+        userRatingCount: 25,
+        businessStatus: 'OPERATIONAL',
+        ...extra,
+    } as GooglePlace);
+
+    it('muestra una cafetería abierta como negocio y con reseñas', () =>
+    {
+        expect(shouldShowPlace(cafe())).toBe(true);
+        expect(shouldShowPlace(cafe({ userRatingCount: 1 }))).toBe(true);
+    });
+
+    it('oculta los lugares sin reseñas en Google (suelen ser cargas falsas)', () =>
+    {
+        expect(shouldShowPlace(cafe({ userRatingCount: 0 }))).toBe(false);
+        expect(shouldShowPlace(cafe({ userRatingCount: undefined }))).toBe(false);
+    });
+
+    it('oculta los cerrados permanentemente, pero no los cerrados temporalmente', () =>
+    {
+        expect(shouldShowPlace(cafe({ businessStatus: 'CLOSED_PERMANENTLY' }))).toBe(false);
+        expect(shouldShowPlace(cafe({ businessStatus: 'CLOSED_TEMPORARILY' }))).toBe(true);
+        expect(shouldShowPlace(cafe({ businessStatus: undefined }))).toBe(true);
+    });
+
+    it('sigue ocultando lo que no es cafetería', () =>
+    {
+        expect(shouldShowPlace(cafe({ types: ['restaurant'], primaryType: 'restaurant' }))).toBe(false);
+        expect(shouldShowPlace(cafe({ primaryType: 'gas_station' }))).toBe(false);
+        expect(shouldShowPlace(cafe({ displayName: { text: 'Estación de servicio YPF' } }))).toBe(false);
     });
 });

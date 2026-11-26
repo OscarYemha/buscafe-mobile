@@ -37,6 +37,7 @@ export type GooglePlace = {
 
     rating?: number;
     userRatingCount?: number;
+    businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY';
     priceLevel?: string;
 
     allowsDogs?: boolean;
