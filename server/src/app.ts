@@ -6,6 +6,7 @@ import favoritesRouter from './routes/favorites.routes.js';
 import zonesRouter from './routes/zones.routes.js';
 import { TRUSTED_PROXIES } from './lib/trustProxy.js';
 import prisma from './lib/prisma.js';
+import { errorHandler, notFoundHandler } from './middleware/errors.js';
 
 const app = express();
 
@@ -47,5 +48,9 @@ app.use('/users', usersRouter);
 app.use('/reviews', reviewsRouter);
 app.use('/favorites', favoritesRouter);
 app.use('/zones', zonesRouter);
+
+// Siempre al final: rutas inexistentes y errores no manejados en JSON.
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;
