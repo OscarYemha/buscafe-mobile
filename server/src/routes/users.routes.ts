@@ -21,7 +21,7 @@ import { createAuthRateLimiters } from '../middleware/rateLimit.js';
 import multer from 'multer';
 import { supabase } from '../lib/supabase.js';
 import {
-    AVATAR_BUCKET,
+    getAvatarBucket,
     deleteAllUserAvatars,
     deletePreviousAvatar,
 } from '../services/avatarStorage.js';
@@ -769,7 +769,7 @@ router.patch(
                 const {
                     error: uploadError,
                 } = await supabase.storage
-                    .from(AVATAR_BUCKET)
+                    .from(getAvatarBucket())
                     .upload(
                         newAvatarPath,
                         file.buffer,
@@ -791,7 +791,7 @@ router.patch(
                 const {
                     data: publicUrlData,
                 } = supabase.storage
-                    .from(AVATAR_BUCKET)
+                    .from(getAvatarBucket())
                     .getPublicUrl(newAvatarPath);
 
                 newAvatarUrl = publicUrlData.publicUrl;
@@ -838,7 +838,7 @@ router.patch(
                 const {
                     error: cleanupError,
                 } = await supabase.storage
-                    .from(AVATAR_BUCKET)
+                    .from(getAvatarBucket())
                     .remove([newAvatarPath]);
 
                 if (cleanupError)
@@ -903,7 +903,7 @@ router.patch(
             const {
                 error: uploadError,
             } = await supabase.storage
-                .from(AVATAR_BUCKET)
+                .from(getAvatarBucket())
                 .upload(
                     filePath,
                     file.buffer,
@@ -925,7 +925,7 @@ router.patch(
             const {
                 data: publicUrlData,
             } = supabase.storage
-                .from(AVATAR_BUCKET)
+                .from(getAvatarBucket())
                 .getPublicUrl(filePath);
 
             const avatarUrl =

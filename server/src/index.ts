@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import app from './app.js';
+import { warnIfLocalDatabaseUsesProductionBucket } from './services/avatarStorage.js';
+
+warnIfLocalDatabaseUsesProductionBucket();
 
 /*
  * Sin estos secretos el login y los códigos de verificación fallan
