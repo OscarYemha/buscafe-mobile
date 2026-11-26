@@ -54,7 +54,6 @@ GitHub desactiva ese workflow si el repo pasa 60 días sin commits:
 si llega el aviso, reactivarlo en Actions.
 
 ## Pendiente
-- README desactualizado (último ítem de la lista de ChatGPT).
 - Actualizar a Expo SDK 58 (tarea aparte; el APK actual ya está validado).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.
