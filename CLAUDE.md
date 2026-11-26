@@ -58,7 +58,10 @@ si llega el aviso, reactivarlo en Actions.
 - Actualizar a Expo SDK 58 (tarea aparte; el APK actual ya está validado).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.
-- Tests: en server faltan los de las rutas de cafés y editar perfil/avatar.
+- Fotos huérfanas en producción (Supabase, bucket avatars): las que
+  dejaron los cambios de foto y las cuentas borradas antes del arreglo
+  de DELETE /users/me. Limpiar con un script de una sola vez (toca datos
+  reales: revisar con Oscar antes de correrlo).
 - Antes de una prueba con otras personas: dominio propio verificado en
   Resend (hoy los mails salen de onboarding@resend.dev y solo le llegan
   al dueño de la cuenta), alertas de presupuesto en Google Cloud y ver si
