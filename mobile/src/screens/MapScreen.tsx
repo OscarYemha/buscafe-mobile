@@ -64,6 +64,7 @@ const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 const SELECTED_CAFE_DELTA = 0.01;
 const SELECTED_PIN_OFFSET = 0.15; // fracción de la altura bajo el centro
 const SELECT_ANIMATION_MS = 400;
+const CALLOUT_RETRY_DELAYS_MS = [80, 300, 700];
 
 const RECENTER_BUTTON_SIZE = 46;
 const RECENTER_BUTTON_MARGIN = 16;
@@ -157,15 +158,19 @@ export default function MapScreen(
             return;
         }
 
-        // El marcador seleccionado se recrea (cambia su key): esperar a que
-        // el nuevo esté en el mapa antes de abrir su tarjeta.
-        setTimeout(() =>
+        // El marcador seleccionado se recrea (cambia su key) y, la primera
+        // vez, Android tarda en cargar la imagen del pin: un único pedido a
+        // los pocos ms se perdía. Se pide varias veces; repetirlo no molesta.
+        for (const delay of CALLOUT_RETRY_DELAYS_MS)
         {
-            if (selectedCafeIdRef.current === cafeId)
+            setTimeout(() =>
             {
-                markerRefs.current[cafeId]?.showCallout();
-            }
-        }, 60);
+                if (selectedCafeIdRef.current === cafeId)
+                {
+                    markerRefs.current[cafeId]?.showCallout();
+                }
+            }, delay);
+        }
     }
 
     function focusCafe(cafe: CafeSummary)
@@ -192,23 +197,38 @@ export default function MapScreen(
      * pestaña), salvo que se haya ido al detalle de un café: al volver, el
      * café sigue seleccionado y la lista en el mismo lugar.
      */
-    const keepSelectionOnBlurRef = useRef(false);
+    // Café que estaba seleccionado al abrir su detalle: al volver se
+    // restaura (y se reabre su tarjeta), pase lo que pase en el medio.
+    const returningFromDetailRef = useRef<string | null>(null);
+    const returnToMyLocationRef = useRef<() => void>(() => undefined);
 
     function openCafeDetail(googlePlaceId: string)
     {
-        keepSelectionOnBlurRef.current = true;
+        returningFromDetailRef.current = googlePlaceId;
         navigation.navigate('CafeDetail', { googlePlaceId });
     }
 
     useFocusEffect(
         useCallback(() => {
-            // Al volver al mapa (por ejemplo, desde el detalle) reabrir la tarjeta.
-            showSelectedCallout(selectedCafeIdRef.current);
+            const restoredCafeId = returningFromDetailRef.current;
+
+            if (restoredCafeId)
+            {
+                // Volviendo del detalle: mismo café seleccionado y su tarjeta.
+                returningFromDetailRef.current = null;
+                setSelectedCafeId(restoredCafeId);
+                showSelectedCallout(restoredCafeId);
+            }
+            else
+            {
+                // Entrando desde otra pestaña: el mapa como la primera vez
+                // (centrado en el usuario, sin selección ni zona explorada).
+                returnToMyLocationRef.current();
+            }
 
             return () => {
-                if (keepSelectionOnBlurRef.current)
+                if (returningFromDetailRef.current)
                 {
-                    keepSelectionOnBlurRef.current = false;
                     return;
                 }
 
@@ -396,6 +416,7 @@ export default function MapScreen(
 
     function returnToMyLocation()
     {
+
         isExploringMapRef.current = false;
 
         ++explorationRequestIdRef.current;
@@ -436,6 +457,9 @@ export default function MapScreen(
             350
         );
     }
+
+    // El efecto de foco se define antes que esta función: la usa por ref.
+    returnToMyLocationRef.current = returnToMyLocation;
 
     function renderCafeCard(cafe: CafeSummary)
     {
