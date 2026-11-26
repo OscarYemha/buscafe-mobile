@@ -106,13 +106,29 @@ async function main()
         fail('Falta PROD_DATABASE_URL (la URL de la base de producción).');
     }
 
-    if (/@(localhost|127\.0\.0\.1)[:/]/.test(databaseUrl))
+    // Nunca se imprime nada de la URL salvo el host: puede tener la contraseña.
+    let parsed: URL;
+
+    try
+    {
+        parsed = new URL(databaseUrl);
+    }
+    catch
+    {
+        fail('PROD_DATABASE_URL no es una URL válida (no se muestra su contenido).');
+    }
+
+    if (!/^postgres(ql)?:$/.test(parsed.protocol) || !parsed.hostname)
+    {
+        fail('PROD_DATABASE_URL tiene que empezar con postgresql:// e incluir el host.');
+    }
+
+    if (['localhost', '127.0.0.1', '::1'].includes(parsed.hostname))
     {
         fail('PROD_DATABASE_URL apunta a una base local. Este script es para producción.');
     }
 
-    const host = databaseUrl.replace(/^[a-z+]+:\/\/[^@]*@/, '').split('/')[0];
-    console.log(`Base: ${host}`);
+    console.log(`Base: ${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}`);
     console.log(`Bucket: ${PRODUCTION_BUCKET}`);
     console.log(`Modo: ${apply ? 'BORRAR (--apply)' : 'solo listar'}\n`);
 
