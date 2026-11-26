@@ -64,7 +64,8 @@ const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 const SELECTED_CAFE_DELTA = 0.01;
 const SELECTED_PIN_OFFSET = 0.15; // fracción de la altura bajo el centro
 const SELECT_ANIMATION_MS = 400;
-const CALLOUT_RETRY_DELAYS_MS = [80, 300, 700];
+const CALLOUT_OPEN_DELAY_MS = 120;
+const REFOCUS_RECENTER_DELAY_MS = 250;
 
 const RECENTER_BUTTON_SIZE = 46;
 const RECENTER_BUTTON_MARGIN = 16;
@@ -158,19 +159,16 @@ export default function MapScreen(
             return;
         }
 
-        // El marcador seleccionado se recrea (cambia su key) y, la primera
-        // vez, Android tarda en cargar la imagen del pin: un único pedido a
-        // los pocos ms se perdía. Se pide varias veces; repetirlo no molesta.
-        for (const delay of CALLOUT_RETRY_DELAYS_MS)
+        // Solo para selecciones que no vienen de tocar el pin (lista, volver
+        // del detalle): al tocar el pin, Google abre la tarjeta solo. Un único
+        // pedido: cada showCallout redibuja la tarjeta y repetirlo parpadeaba.
+        setTimeout(() =>
         {
-            setTimeout(() =>
+            if (selectedCafeIdRef.current === cafeId)
             {
-                if (selectedCafeIdRef.current === cafeId)
-                {
-                    markerRefs.current[cafeId]?.showCallout();
-                }
-            }, delay);
-        }
+                markerRefs.current[cafeId]?.showCallout();
+            }
+        }, CALLOUT_OPEN_DELAY_MS);
     }
 
     function focusCafe(cafe: CafeSummary)
@@ -200,7 +198,8 @@ export default function MapScreen(
     // Café que estaba seleccionado al abrir su detalle: al volver se
     // restaura (y se reabre su tarjeta), pase lo que pase en el medio.
     const returningFromDetailRef = useRef<string | null>(null);
-    const returnToMyLocationRef = useRef<() => void>(() => undefined);
+    const returnToMyLocationRef = useRef<(animationMs?: number) => void>(() => undefined);
+    const refocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     function openCafeDetail(googlePlaceId: string)
     {
@@ -223,10 +222,22 @@ export default function MapScreen(
             {
                 // Entrando desde otra pestaña: el mapa como la primera vez
                 // (centrado en el usuario, sin selección ni zona explorada).
-                returnToMyLocationRef.current();
+                // Después de la transición: con el mapa todavía oculto, Android
+                // ignora el movimiento de cámara.
+                refocusTimerRef.current = setTimeout(() =>
+                {
+                    refocusTimerRef.current = null;
+                    returnToMyLocationRef.current(0);
+                }, REFOCUS_RECENTER_DELAY_MS);
             }
 
             return () => {
+                if (refocusTimerRef.current)
+                {
+                    clearTimeout(refocusTimerRef.current);
+                    refocusTimerRef.current = null;
+                }
+
                 if (returningFromDetailRef.current)
                 {
                     return;
@@ -322,11 +333,6 @@ export default function MapScreen(
         );
     }
 
-    // Abrir la tarjeta del pin cada vez que cambia la selección.
-    useEffect(() => {
-        showSelectedCallout(selectedCafeId);
-    }, [selectedCafeId]);
-
     useEffect(() => {
         if (
             !userLocation ||
@@ -414,7 +420,7 @@ export default function MapScreen(
         }
     }
 
-    function returnToMyLocation()
+    function returnToMyLocation(animationMs = 350)
     {
 
         isExploringMapRef.current = false;
@@ -454,7 +460,7 @@ export default function MapScreen(
                 latitudeDelta: 0.02,
                 longitudeDelta: 0.02,
             },
-            350
+            animationMs
         );
     }
 
@@ -625,7 +631,7 @@ export default function MapScreen(
                             latitudeDelta: 0.02,
                             longitudeDelta: 0.02,
                         }}
-                        showsUserLocation
+                        showsUserLocation={false}
                         showsMyLocationButton={false}
                         toolbarEnabled={false}
                         moveOnMarkerPress={false}
@@ -701,17 +707,30 @@ export default function MapScreen(
                         }}
                     >
 
+                    {/* Ubicación del usuario como pin propio: el puntito nativo de
+                        Google se dibuja por encima de las tarjetas. */}
+                    {userLocation && (
+                        <Marker
+                            coordinate={{
+                                latitude: userLocation.latitude,
+                                longitude: userLocation.longitude,
+                            }}
+                            anchor={{ x: 0.5, y: 0.5 }}
+                            tappable={false}
+                            zIndex={0}
+                        >
+                            <View style={styles.userDot}>
+                                <View style={styles.userDotInner} />
+                            </View>
+                        </Marker>
+                    )}
+
                     {sortedCafes.map((cafe) => (
                         <Marker
-                            // La key cambia con la selección para recrear el
-                            // marcador: en Android, Google Maps no aplica un
-                            // zIndex nuevo a un marcador ya dibujado, y el pin
-                            // elegido desde la lista quedaba debajo del resto.
-                            key={
-                                selectedCafeId === cafe.googlePlaceId
-                                    ? `${cafe.googlePlaceId}-selected`
-                                    : cafe.googlePlaceId
-                            }
+                            // Key estable: recrear el pin al seleccionarlo hacía
+                            // parpadear la tarjeta. Cada pin tiene su tarjeta lista
+                            // (abajo), así Google la abre en el acto al tocarlo.
+                            key={cafe.googlePlaceId}
                             image={
                                 selectedCafeId === cafe.googlePlaceId
                                     ? require('../../assets/cafe-marker-selected.png')
@@ -758,11 +777,9 @@ export default function MapScreen(
                                 });
                             }}
                         >
-                            {selectedCafeId === cafe.googlePlaceId && (
-                                <Callout tooltip>
-                                    {renderCafeCard(cafe)}
-                                </Callout>
-                            )}
+                            <Callout tooltip>
+                                {renderCafeCard(cafe)}
+                            </Callout>
                         </Marker>
                     ))}
 
@@ -811,7 +828,7 @@ export default function MapScreen(
                                         RECENTER_BUTTON_MARGIN,
                                 },
                             ]}
-                            onPress={returnToMyLocation}
+                            onPress={() => returnToMyLocation()}
                             accessibilityLabel="Volver a mi ubicación"
                         >
                             <Ionicons name="locate" size={24} color="#6B3A22" />
@@ -911,6 +928,7 @@ export default function MapScreen(
                                             cafe.googlePlaceId
                                         );
                                         focusCafe(cafe);
+                                        showSelectedCallout(cafe.googlePlaceId);
                                     }}
                                 >
                                     <View style={styles.cafeMainInfo}>
@@ -1003,6 +1021,23 @@ const styles = StyleSheet.create({
 
     map: {
         flex: 1,
+    },
+
+    userDot: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 3,
+    },
+
+    userDotInner: {
+        width: 13,
+        height: 13,
+        borderRadius: 6.5,
+        backgroundColor: '#4285F4',
     },
 
     calloutContainer: {
