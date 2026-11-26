@@ -17,20 +17,6 @@ export type CafeSearchResult = {
     resolvedQuery: string;
 }
 
-export async function getCafes() 
-{
-    const response = await fetch(`${API_URL}/cafes`);
-    
-    if (!response.ok)
-    {
-        throw new Error(
-            'No se pudieron obtener las cafeterías'
-        );
-    }
-
-    return response.json();
-}
-
 export async function getNearbyCafes(
     latitude: number,
     longitude: number,

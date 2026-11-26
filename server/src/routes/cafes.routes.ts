@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import prisma from '../lib/prisma.js';
 import {
     getPlaceDetails,
     getPlacePhoto,
@@ -14,20 +13,6 @@ import { getCafeStats } from '../services/cafeStats.js';
 import { filterCafesByRecommendation, filterCafesByRating, filterPetFriendlyCafes } from '../services/cafeRanking.js';
 
 const router = Router();
-
-router.get('/', async (req, res) => {
-    try {
-        const cafes = await prisma.cafe.findMany();
-
-        return res.json(cafes);
-    } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            error: 'No se pudieron obtener las cafeterías',
-        });
-    }
-});
 
 router.get('/nearby', async (req, res) => {
     try
@@ -526,53 +511,6 @@ router.get('/place/:googlePlaceId', async (req, res) => {
 
         return res.status(500).json({
             error: 'No se pudo obtener el detalle de la cafetería',
-        });
-    }
-});
-
-router.get('/:id', async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                error: 'El ID de la cafetería es inválido',
-            });
-        }
-
-        const cafe = await prisma.cafe.findUnique({
-            where: {
-                id,
-            },
-            include: {
-                reviews: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                    orderBy: {
-                        createdAt: 'desc',
-                    }
-                },
-            },
-        });
-
-        if (!cafe) {
-            return res.status(404).json({
-                error: 'Cafetería no encontrada',
-            });
-        }
-
-        return res.json(cafe);
-    } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            error: 'No se pudo obtener la cafetería',
         });
     }
 });
