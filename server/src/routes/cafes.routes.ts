@@ -3,9 +3,11 @@ import prisma from '../lib/prisma.js';
 import {
     getPlaceDetails,
     getPlacePhoto,
+    GooglePlaceNotFoundError,
     searchCafes,
     searchCafesNearby,
 } from '../services/googlePlaces.js';
+import { isValidGooglePlaceId } from '../services/cafes.js';
 import { mapGooglePlaceToCafeSummary } from '../services/cafeMapper.js';
 import { calculateDistanceKm } from '../utils/distance.js';
 import { getCafeStats } from '../services/cafeStats.js';
@@ -42,6 +44,16 @@ router.get('/nearby', async (req, res) => {
         {
             return res.status(400).json({
                 error: 'Latitud y longitud son obligatorias',
+            });
+        }
+
+        if (
+            latitude < -90 || latitude > 90 ||
+            longitude < -180 || longitude > 180
+        )
+        {
+            return res.status(400).json({
+                error: 'Latitud o longitud fuera de rango',
             });
         }
 
@@ -304,8 +316,7 @@ router.get('/place/:googlePlaceId/photo/:index', async (req, res) => {
         const { googlePlaceId, index } = req.params;
 
         if (
-            typeof googlePlaceId !== 'string' ||
-            !googlePlaceId.trim() ||
+            !isValidGooglePlaceId(googlePlaceId) ||
             typeof index !== 'string' ||
             !/^[0-4]$/.test(index)
         ) {
@@ -332,6 +343,13 @@ router.get('/place/:googlePlaceId/photo/:index', async (req, res) => {
         });
     }
     catch (error) {
+        if (error instanceof GooglePlaceNotFoundError)
+        {
+            return res.status(404).json({
+                error: 'Fotografía no disponible',
+            });
+        }
+
         console.error('ERROR OBTENIENDO FOTOGRAFÍA:', error);
 
         return res.status(502).json({
@@ -345,7 +363,8 @@ router.get('/place/:googlePlaceId', async (req, res) => {
     {
         const googlePlaceId = req.params.googlePlaceId;
 
-        if (typeof googlePlaceId !== 'string' || googlePlaceId.trim() === '')
+        // Validar el formato antes de consultar (y pagar) a Google.
+        if (!isValidGooglePlaceId(googlePlaceId))
         {
             return res.status(400).json({
                 error: 'El ID de Google Places es inválido',
@@ -496,6 +515,13 @@ router.get('/place/:googlePlaceId', async (req, res) => {
     }
     catch (error)
     {
+        if (error instanceof GooglePlaceNotFoundError)
+        {
+            return res.status(404).json({
+                error: 'No se pudo obtener la cafetería',
+            });
+        }
+
         console.error(error);
 
         return res.status(500).json({
