@@ -49,6 +49,24 @@ export type CafeSearchResult = {
     resolvedQuery: string;
 };
 
+/**
+ * Si un lugar de Google se muestra en los listados: tiene que ser una
+ * cafetería (isCafe), seguir abierto como negocio y tener al menos una
+ * reseña en Google. Los lugares sin reseñas suelen ser cargas falsas o
+ * comercios que no son cafeterías aunque estén marcados así.
+ */
+export function shouldShowPlace(place: GooglePlace): boolean {
+    if (place.businessStatus === 'CLOSED_PERMANENTLY') {
+        return false;
+    }
+
+    if (!place.userRatingCount || place.userRatingCount < 1) {
+        return false;
+    }
+
+    return isCafe(place);
+}
+
 function isCafe(place: GooglePlace): boolean {
     const types = place.types ?? [];
 
@@ -131,6 +149,7 @@ async function searchCafesByText(
                     'places.googleMapsTypeLabel',
                     'places.rating',
                     'places.userRatingCount',
+                    'places.businessStatus',
                     'places.priceLevel',
                     'places.allowsDogs',
                     'places.currentOpeningHours.openNow',
@@ -221,7 +240,7 @@ export async function searchAllCafesByText(
         uniquePlaces.filter((place) => {
             if (
                 !place.location ||
-                !isCafe(place)
+                !shouldShowPlace(place)
             ) {
                 return false;
             }
@@ -276,6 +295,7 @@ async function searchNearbyAtPoint(
                     'places.googleMapsTypeLabel',
                     'places.rating',
                     'places.userRatingCount',
+                    'places.businessStatus',
                     'places.priceLevel',
                     'places.allowsDogs',
                     'places.currentOpeningHours.openNow',
@@ -390,7 +410,7 @@ export async function searchCafesNearby(
                 );
             });
 
-    return nearbyPlaces.filter(isCafe);
+    return nearbyPlaces.filter(shouldShowPlace);
 }
 
 async function searchPlacesByQuery(
@@ -426,6 +446,7 @@ async function searchPlacesByQuery(
                     'places.googleMapsTypeLabel',
                     'places.rating',
                     'places.userRatingCount',
+                    'places.businessStatus',
                     'places.priceLevel',
                     'places.allowsDogs',
                     'places.currentOpeningHours.openNow',
@@ -483,7 +504,7 @@ export async function searchCafes(
         return {
             places: page.places.filter((place) =>
                 place.location &&
-                isCafe(place)
+                shouldShowPlace(place)
             ),
             nextPageToken:
                 page.nextPageToken ?? null,
@@ -499,7 +520,7 @@ export async function searchCafes(
     const directCafes =
         directPage.places.filter((place) =>
             place.location &&
-            isCafe(place)
+            shouldShowPlace(place)
         );
 
     if (directCafes.length > 0)
@@ -523,7 +544,7 @@ export async function searchCafes(
     return {
         places: areaPage.places.filter((place) =>
             place.location &&
-            isCafe(place)
+            shouldShowPlace(place)
         ),
         nextPageToken:
             areaPage.nextPageToken ?? null,
