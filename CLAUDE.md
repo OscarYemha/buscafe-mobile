@@ -54,9 +54,14 @@ si llega el aviso, reactivarlo en Actions.
 
 ## Pendiente
 - README desactualizado (último ítem de la lista de ChatGPT).
-- Probar en el próximo APK lo que en Expo Go no se ve (el mapa sale gris
-  porque Expo Go trae react-native-maps 1.27): "Buscar en esta zona"
-  (demora y que no tape la tarjeta) y abierto/cerrado en el mapa.
-- Después de validar el APK: actualizar a Expo SDK 58 (tarea aparte).
+- Actualizar a Expo SDK 58 (tarea aparte; el APK actual ya está validado).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.
+- Tests de mobile (no hay ninguno): instalar jest-expo y testear la
+  lógica (getCurrentLocation, manejo del 401, zona guardada, distancias,
+  ordenamiento). En server faltan tests de las rutas de cafés y de
+  editar perfil/avatar.
+- Antes de una prueba con otras personas: dominio propio verificado en
+  Resend (hoy los mails salen de onboarding@resend.dev y solo le llegan
+  al dueño de la cuenta), alertas de presupuesto en Google Cloud y ver si
+  el plan de Render duerme el server.
