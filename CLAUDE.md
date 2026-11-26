@@ -29,12 +29,17 @@ bajarlo con `expo install --fix`.
 - APK: `npx eas-cli build -p android --profile preview` (gasta un build del
   cupo mensual). Hace falta uno nuevo solo si cambia algo nativo (SDK,
   paquetes con código nativo, app.config.js).
-- Cambios de JS: `npm run update:preview` en mobile/ los manda por aire al
-  APK (canal preview). Nunca correr `eas update` sin `--environment
-  preview`: usaría la IP local de mobile/.env y la app de producción
-  dejaría de andar.
+- Cambios de JS: en mobile/ correr
+  `npx eas-cli update --channel preview --environment preview --platform android --message "..."`
+  (o `npm run update:preview` si eas-cli está instalado global). Nunca sin
+  `--environment preview`: usaría la IP local de mobile/.env y la app de
+  producción dejaría de andar.
 - runtimeVersion usa la política "fingerprint": si cambió algo nativo,
   la actualización no le llega a los APK viejos (hace falta APK nuevo).
+  Ojo: los `scripts` de mobile/package.json también entran en el
+  fingerprint; cambiarlos rompe la compatibilidad con los APK instalados.
+  Antes de publicar, verificar con
+  `npx eas-cli fingerprint:compare --build-id <id> --environment preview`.
 
 ## Deploy (Render, auto-deploy desde master)
 Mergear a master despliega. Procedimiento: desactivar auto-deploy →
@@ -49,9 +54,14 @@ si llega el aviso, reactivarlo en Actions.
 
 ## Pendiente
 - README desactualizado (último ítem de la lista de ChatGPT).
-- Probar en el próximo APK lo que en Expo Go no se ve (el mapa sale gris
-  porque Expo Go trae react-native-maps 1.27): "Buscar en esta zona"
-  (demora y que no tape la tarjeta) y abierto/cerrado en el mapa.
-- Después de validar el APK: actualizar a Expo SDK 58 (tarea aparte).
+- Actualizar a Expo SDK 58 (tarea aparte; el APK actual ya está validado).
   Expo Go del Play Store solo soporta el último SDK. Revisar qué versión
   de react-native-maps espera el 58 y si se puede sacar la exclusión.
+- Tests de mobile (no hay ninguno): instalar jest-expo y testear la
+  lógica (getCurrentLocation, manejo del 401, zona guardada, distancias,
+  ordenamiento). En server faltan tests de las rutas de cafés y de
+  editar perfil/avatar.
+- Antes de una prueba con otras personas: dominio propio verificado en
+  Resend (hoy los mails salen de onboarding@resend.dev y solo le llegan
+  al dueño de la cuenta), alertas de presupuesto en Google Cloud y ver si
+  el plan de Render duerme el server.

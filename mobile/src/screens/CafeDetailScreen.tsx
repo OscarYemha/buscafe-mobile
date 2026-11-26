@@ -9,6 +9,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { formatDistance } from '../utils/distance';
+import { Ionicons } from '@expo/vector-icons';
 import {
     useCallback,
     useEffect,
@@ -399,7 +401,7 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                     )}
                     {cafe.distanceKm !== null && (
                         <Text style={styles.info}>
-                            📏 {cafe.distanceKm.toFixed(2)} km
+                            📏 {formatDistance(cafe.distanceKm)}
                         </Text>
                     )}
                     <Text style={styles.infoAddress}>
@@ -652,7 +654,8 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                     }}
                 >
                     <Text style={styles.directionsButtonText}>
-                        📍 Cómo llegar
+                        <Ionicons name="location" size={16} color="#FFFFFF" />
+                        {'  '}Cómo llegar
                     </Text>
                 </TouchableOpacity>
             </ScrollView>

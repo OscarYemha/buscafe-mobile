@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { formatDistance } from '../utils/distance';
+import { Ionicons } from '@expo/vector-icons';
 import {
     useCallback,
     useEffect,
@@ -52,6 +54,16 @@ const PIN_VERTICAL_OFFSET = 36;
 const SEARCH_AREA_MIN_MOVEMENT = 0.30;
 const SEARCH_AREA_MIN_ZOOM_CHANGE = 0.35;
 const SEARCH_AREA_BUTTON_DELAY_MS = 700;
+
+/*
+ * Al seleccionar un café el mapa se centra con el pin más abajo (a un 70 %
+ * de la altura), para dejar lugar arriba a la tarjeta. Si igual no entra
+ * arriba, la tarjeta se muestra debajo del pin en vez de ocultarse.
+ */
+const SELECTED_CAFE_DELTA = 0.01;
+const SELECTED_PIN_OFFSET = 0.2; // fracción de la altura bajo el centro
+const POPUP_EDGE_MARGIN = 12;
+const POPUP_BELOW_GAP = 10;
 
 // Proyección de Mercator para acompañar el gesto sin esperar al puente nativo.
 function mercatorY(latitude: number): number
@@ -158,9 +170,28 @@ export default function MapScreen(
     const [popupHeight, setPopupHeight] = useState(0);
     const [popupPoint, setPopupPoint] = useState<(MapPoint & { id: string }) | null>(null);
 
+    /*
+     * Al salir del mapa se limpia la selección (por ejemplo, al cambiar de
+     * pestaña), salvo que se haya ido al detalle de un café: al volver, el
+     * café sigue seleccionado y la lista en el mismo lugar.
+     */
+    const keepSelectionOnBlurRef = useRef(false);
+
+    function openCafeDetail(googlePlaceId: string)
+    {
+        keepSelectionOnBlurRef.current = true;
+        navigation.navigate('CafeDetail', { googlePlaceId });
+    }
+
     useFocusEffect(
         useCallback(() => {
             return () => {
+                if (keepSelectionOnBlurRef.current)
+                {
+                    keepSelectionOnBlurRef.current = false;
+                    return;
+                }
+
                 setSelectedCafeId(null);
 
                 listRef.current?.scrollToOffset({
@@ -217,19 +248,17 @@ export default function MapScreen(
                 360 - longitudeDifference
             ) / reference.longitudeDelta;
 
-        const zoomChange = Math.max(
-            Math.abs(
-                current.latitudeDelta / reference.latitudeDelta - 1
-            ),
-            Math.abs(
-                current.longitudeDelta / reference.longitudeDelta - 1
-            )
+        // Solo cuenta alejarse (ver más área). Acercarse no muestra lugares
+        // nuevos: lo que se ve ya está cubierto por la búsqueda.
+        const zoomOut = Math.max(
+            current.latitudeDelta / reference.latitudeDelta - 1,
+            current.longitudeDelta / reference.longitudeDelta - 1
         );
 
         return (
             latitudeMovement >= SEARCH_AREA_MIN_MOVEMENT ||
             longitudeMovement >= SEARCH_AREA_MIN_MOVEMENT ||
-            zoomChange >= SEARCH_AREA_MIN_ZOOM_CHANGE
+            zoomOut >= SEARCH_AREA_MIN_ZOOM_CHANGE
         );
     }
 
@@ -414,6 +443,18 @@ export default function MapScreen(
         );
     }
 
+    const popupFitsAbove =
+        popupPoint !== null &&
+        popupPoint.y - PIN_VERTICAL_OFFSET - popupHeight >= POPUP_EDGE_MARGIN;
+
+    const popupFitsBelow =
+        popupPoint !== null &&
+        popupPoint.y + POPUP_BELOW_GAP + popupHeight <=
+            mapSize.height - POPUP_EDGE_MARGIN;
+
+    const popupPlacement: 'above' | 'below' =
+        popupFitsAbove ? 'above' : 'below';
+
     const isPopupVisible =
         selectedCafe !== null &&
         popupPoint !== null &&
@@ -422,7 +463,7 @@ export default function MapScreen(
         popupPoint.x >= 0 &&
         popupPoint.x <= mapSize.width &&
         popupPoint.y <= mapSize.height &&
-        popupPoint.y - PIN_VERTICAL_OFFSET - popupHeight >= 12;
+        (popupFitsAbove || popupFitsBelow);
 
     useEffect(() => {
         if (!userLocation || searchReferenceRegionRef.current) {
@@ -495,11 +536,21 @@ export default function MapScreen(
                                     styles.locationButtonText
                                 }
                             >
+                                <Ionicons
+                                    name={
+                                        locationServicesDisabled || canAskLocationAgain
+                                            ? 'location'
+                                            : 'settings'
+                                    }
+                                    size={16}
+                                    color="#FFFFFF"
+                                />
+                                {'  '}
                                 {locationServicesDisabled
-                                    ? '📍 Activar ubicación'
+                                    ? 'Activar ubicación'
                                     : canAskLocationAgain
-                                        ? '📍 Usar mi ubicación'
-                                        : '⚙️ Abrir ajustes'}
+                                        ? 'Usar mi ubicación'
+                                        : 'Abrir ajustes'}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -619,7 +670,15 @@ export default function MapScreen(
 
                     {sortedCafes.map((cafe) => (
                         <Marker
-                            key={cafe.googlePlaceId}
+                            // La key cambia con la selección para recrear el
+                            // marcador: en Android, Google Maps no aplica un
+                            // zIndex nuevo a un marcador ya dibujado, y el pin
+                            // elegido desde la lista quedaba debajo del resto.
+                            key={
+                                selectedCafeId === cafe.googlePlaceId
+                                    ? `${cafe.googlePlaceId}-selected`
+                                    : cafe.googlePlaceId
+                            }
                             image={
                                 selectedCafeId === cafe.googlePlaceId
                                     ? require('../../assets/cafe-marker-selected.png')
@@ -647,9 +706,10 @@ export default function MapScreen(
 
                                 mapRef.current?.animateToRegion(
                                     {
-                                        latitude: cafe.latitude,
+                                        latitude: cafe.latitude +
+                                            SELECTED_CAFE_DELTA * SELECTED_PIN_OFFSET,
                                         longitude: cafe.longitude,
-                                        latitudeDelta: 0.01,
+                                        latitudeDelta: SELECTED_CAFE_DELTA,
                                         longitudeDelta: 0.01,
                                     },
                                     350
@@ -688,8 +748,14 @@ export default function MapScreen(
                                 styles.popupAnchor,
                                 {
                                     left: popupPoint.x - CARD_WIDTH / 2,
-                                    top: popupPoint.y - PIN_VERTICAL_OFFSET,
-                                    transform: [{ translateY: -popupHeight }],
+                                    ...(popupPlacement === 'above'
+                                        ? {
+                                            top: popupPoint.y - PIN_VERTICAL_OFFSET,
+                                            transform: [{ translateY: -popupHeight }],
+                                        }
+                                        : {
+                                            top: popupPoint.y + POPUP_BELOW_GAP,
+                                        }),
                                     opacity: isPopupVisible ? 1 : 0,
                                 },
                             ]}
@@ -701,23 +767,30 @@ export default function MapScreen(
                                 }
                             }}
                         >
+                            {popupPlacement === 'below' && (
+                                <View style={styles.popupTailUp} />
+                            )}
                             <TouchableOpacity
                                 activeOpacity={0.9}
                                 accessibilityRole="button"
                                 accessibilityLabel={`Ver detalles de ${selectedCafe.name}`}
                                 style={styles.popupCard}
-                                onPress={() => navigation.navigate('CafeDetail', {
-                                    googlePlaceId: selectedCafe.googlePlaceId,
-                                })}
+                                onPress={() => openCafeDetail(selectedCafe.googlePlaceId)}
                             >
                                 <View style={styles.popupTitleRow}>
                                     <Text style={styles.popupTitle} numberOfLines={2}>
                                         {selectedCafe.name}
                                     </Text>
-                                    <Text style={styles.popupCoffee}>☕</Text>
+                                    <Ionicons
+                                        name="cafe"
+                                        size={18}
+                                        color="#6B3A22"
+                                        style={styles.popupCoffee}
+                                    />
                                 </View>
                                 <Text style={styles.popupAddress} numberOfLines={1}>
-                                    📍 {selectedCafe.shortAddress}
+                                    <Ionicons name="location" size={12} color="#7A6254" />
+                                    {' '}{selectedCafe.shortAddress}
                                 </Text>
                                 {selectedCafeStatus && (
                                     <Text
@@ -736,7 +809,7 @@ export default function MapScreen(
                                         <Text style={styles.popupRatingValue}>
                                             ★ {selectedCafe.googleRating !== null
                                                 ? selectedCafe.googleRating.toFixed(1)
-                                                : 'Sin puntuación'}
+                                                : 'Sin valoraciones'}
                                         </Text>
                                     </View>
                                     <View style={styles.popupRatingColumn}>
@@ -744,13 +817,15 @@ export default function MapScreen(
                                         <Text style={styles.popupRatingValue}>
                                             {selectedCafe.buscafeRating !== null
                                                 ? `★ ${selectedCafe.buscafeRating.toFixed(1)}`
-                                                : 'Sin puntuación'}
+                                                : 'Sin valoraciones'}
                                         </Text>
                                     </View>
                                     <Text style={styles.popupChevron}>›</Text>
                                 </View>
                             </TouchableOpacity>
-                            <View style={styles.popupTail} />
+                            {popupPlacement === 'above' && (
+                                <View style={styles.popupTail} />
+                            )}
                         </View>
                     )}
 
@@ -763,9 +838,7 @@ export default function MapScreen(
                             onPress={returnToMyLocation}
                             accessibilityLabel="Volver a mi ubicación"
                         >
-                            <Text style={styles.recenterButtonText}>
-                                🎯
-                            </Text>
+                            <Ionicons name="locate" size={24} color="#6B3A22" />
                         </TouchableOpacity>
                     </View>
                     {showSearchAreaButton && !explorationLoading && !selectedCafe && (
@@ -846,13 +919,7 @@ export default function MapScreen(
                                             cafe.googlePlaceId
                                         )
                                         {
-                                            navigation.navigate(
-                                                'CafeDetail',
-                                                {
-                                                    googlePlaceId:
-                                                        cafe.googlePlaceId,
-                                                }
-                                            );
+                                            openCafeDetail(cafe.googlePlaceId);
 
                                             return;
                                         }
@@ -865,9 +932,10 @@ export default function MapScreen(
 
                                         mapRef.current?.animateToRegion(
                                             {
-                                                latitude: cafe.latitude,
+                                                latitude: cafe.latitude +
+                                                    SELECTED_CAFE_DELTA * SELECTED_PIN_OFFSET,
                                                 longitude: cafe.longitude,
-                                                latitudeDelta: 0.01,
+                                                latitudeDelta: SELECTED_CAFE_DELTA,
                                                 longitudeDelta: 0.01,
                                             },
                                             350
@@ -890,19 +958,19 @@ export default function MapScreen(
                                             Google ★{' '}
                                             {cafe.googleRating !== null
                                                 ? cafe.googleRating.toFixed(1)
-                                                : 'Sin reseñas'}
+                                                : 'Sin valoraciones'}
                                             {'   ·   '}
                                             BusCafé ★{' '}
                                             {cafe.buscafeRating !== null
                                                 ? cafe.buscafeRating.toFixed(1)
-                                                : 'Sin reseñas'}
+                                                : 'Sin valoraciones'}
                                         </Text>
                                     </View>
 
                                     <View style={styles.cafeSideInfo}>
                                         <Text style={styles.cafeDistance}>
                                             {cafe.distanceKm !== null
-                                                ? `${cafe.distanceKm.toFixed(1)} km`
+                                                ? formatDistance(cafe.distanceKm)
                                                 : '—'}
                                         </Text>
                                         {(() => {
@@ -1008,7 +1076,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#4A2416',
     },
-    popupCoffee: { fontSize: 17, marginLeft: 8 },
+    popupCoffee: { marginLeft: 8 },
     popupAddress: { marginTop: 5, color: '#7A6254', fontSize: 12 },
     popupStatus: { marginTop: 4, fontSize: 12, fontWeight: '700' },
     popupDivider: {
@@ -1038,6 +1106,16 @@ const styles = StyleSheet.create({
         borderColor: '#E8D9C7',
         transform: [{ rotate: '45deg' }],
         marginTop: -7,
+    },
+    popupTailUp: {
+        width: 12,
+        height: 12,
+        backgroundColor: '#FFFFFF',
+        borderLeftWidth: 1,
+        borderTopWidth: 1,
+        borderColor: '#E8D9C7',
+        transform: [{ rotate: '45deg' }],
+        marginBottom: -7,
     },
 
     selectedCafeName: {
@@ -1163,10 +1241,9 @@ const styles = StyleSheet.create({
     },
 
     searchAreaButton: {
-        alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
         borderRadius: 24,
         borderWidth: 1,
         borderColor: '#E8D9C7',
@@ -1176,7 +1253,7 @@ const styles = StyleSheet.create({
     searchAreaButtonText: {
         color: '#4A2416',
         fontWeight: '700',
-        fontSize: 14,
+        fontSize: 13,
     },
 
     recenterButton: {
@@ -1190,9 +1267,6 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
 
-    recenterButtonText: {
-        fontSize: 23,
-    },
 
     explorationStatus: {
         position: 'absolute',
@@ -1221,8 +1295,7 @@ const styles = StyleSheet.create({
     searchAreaContainer: {
         position: 'absolute',
         top: 70,
-        left: 20,
-        right: 20,
+        alignSelf: 'center',
         zIndex: 15,
     },
 });

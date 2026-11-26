@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -103,9 +104,14 @@ export default function ResultsScreen({ route, navigation }: Props)
         }
         else
         {
+            // Carga nueva (entrar o cambiar de zona): no dejar a la vista los
+            // cafés de la zona anterior mientras llegan los nuevos. El
+            // pull-to-refresh sí los mantiene.
+            setCafes([]);
             setLoading(true);
             setRefreshing(false);
             refreshingRef.current = false;
+            scrollViewRef.current?.scrollTo({ y: 0, animated: false });
         }
 
         setError(null);
@@ -299,9 +305,12 @@ export default function ResultsScreen({ route, navigation }: Props)
                 )}
 
                 {loading && cafes.length === 0 && (
-                    <Text style={styles.message}>
-                        Buscando cafeterías...
-                    </Text>
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#6B3A22" />
+                        <Text style={styles.message}>
+                            Buscando cafeterías...
+                        </Text>
+                    </View>
                 )}
 
                 {error && (
@@ -406,6 +415,12 @@ const styles = StyleSheet.create({
     message: {
         fontSize: 16,
         color: '#7A6254',
+    },
+
+    loadingContainer: {
+        marginTop: 40,
+        alignItems: 'center',
+        gap: 12,
     },
 
     errorContainer: {
