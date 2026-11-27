@@ -165,5 +165,6 @@ export function mapGooglePlaceToCafeSummary(
         priceLevel: mapGooglePriceLevel(place.priceLevel),
         isOpen: place.currentOpeningHours?.openNow ?? null,
         allowsDogs: place.allowsDogs ?? null,
+        servesVegetarianFood: place.servesVegetarianFood ?? null,
     };
 }

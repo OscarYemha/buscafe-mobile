@@ -162,6 +162,23 @@ describe('GET /cafes/nearby', () =>
         expect(res.body.map((cafe: { googlePlaceId: string }) => cafe.googlePlaceId)).toEqual(['perros']);
     });
 
+    it('incluye si Google dice que hay opción vegetariana (null si no lo sabe)', async () =>
+    {
+        google.searchCafesNearby.mockResolvedValue([
+            place('veggie', OBELISCO, { servesVegetarianFood: true }),
+            place('sin-dato', OBELISCO),
+        ]);
+
+        const res = await get('/cafes/nearby?latitude=-34.6&longitude=-58.38');
+
+        const byId = Object.fromEntries(
+            res.body.map((cafe: { googlePlaceId: string; servesVegetarianFood: boolean | null }) =>
+                [cafe.googlePlaceId, cafe.servesVegetarianFood])
+        );
+
+        expect(byId).toEqual({ veggie: true, 'sin-dato': null });
+    });
+
     it('500 si falla Google', async () =>
     {
         google.searchCafesNearby.mockRejectedValue(new Error('Google caído'));
