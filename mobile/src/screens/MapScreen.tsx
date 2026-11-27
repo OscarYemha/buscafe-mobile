@@ -1,5 +1,6 @@
 import {
     ActivityIndicator,
+    Animated,
     FlatList,
     Linking,
     StyleSheet,
@@ -79,6 +80,7 @@ const RECENTER_BUTTON_SIZE = 46;
 const RECENTER_BUTTON_MARGIN = 16;
 const POPUP_EDGE_MARGIN = 12;
 const POPUP_BELOW_GAP = 10;
+const POPUP_FADE_IN_MS = 150;
 
 type Props = CompositeScreenProps<
     BottomTabScreenProps<
@@ -558,6 +560,27 @@ export default function MapScreen(
         popupPoint.y <= mapSize.height &&
         (popupFitsAbove || popupFitsBelow);
 
+    // La tarjeta aparece con un fundido corto: si Android avisa que el mapa
+    // terminó de moverse un instante antes de tiempo y se corre unos
+    // píxeles, casi no se nota. Al ocultarse lo hace al instante.
+    const popupOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (isPopupVisible)
+        {
+            Animated.timing(popupOpacity, {
+                toValue: 1,
+                duration: POPUP_FADE_IN_MS,
+                useNativeDriver: true,
+            }).start();
+        }
+        else
+        {
+            popupOpacity.stopAnimation();
+            popupOpacity.setValue(0);
+        }
+    }, [isPopupVisible, popupOpacity]);
+
     useEffect(() => {
         if (!userLocation || searchReferenceRegionRef.current) {
             return;
@@ -813,7 +836,7 @@ export default function MapScreen(
                     {selectedCafe && popupPoint?.id === selectedCafe.googlePlaceId &&
                         popupPoint.x >= 0 && popupPoint.x <= mapSize.width &&
                         popupPoint.y >= 0 && popupPoint.y <= mapSize.height && (
-                        <View
+                        <Animated.View
                             pointerEvents={isPopupVisible ? 'box-none' : 'none'}
                             style={[
                                 styles.popupAnchor,
@@ -827,7 +850,7 @@ export default function MapScreen(
                                         : {
                                             top: popupPoint.y + POPUP_BELOW_GAP,
                                         }),
-                                    opacity: isPopupVisible ? 1 : 0,
+                                    opacity: popupOpacity,
                                 },
                             ]}
                             onLayout={event => {
@@ -897,7 +920,7 @@ export default function MapScreen(
                             {popupPlacement === 'above' && (
                                 <View style={styles.popupTail} />
                             )}
-                        </View>
+                        </Animated.View>
                     )}
 
                     <View
