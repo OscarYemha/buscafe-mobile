@@ -9,12 +9,13 @@ import {
     View,
 } from 'react-native';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../context/AuthContext';
+import { getMyReviews } from '../services/api';
 import {
     AccountStackParamList,
     RootStackParamlist,
@@ -38,6 +39,37 @@ export default function AccountScreen()
 
     // Ver la foto de perfil en grande.
     const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+
+    // Cantidad de reseñas escritas: se actualiza cada vez que se vuelve a la
+    // pantalla (por ejemplo, después de publicar una reseña).
+    const [reviewsCount, setReviewsCount] = useState<number | null>(null);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (!user)
+            {
+                setReviewsCount(null);
+                return;
+            }
+
+            let active = true;
+
+            getMyReviews()
+                .then((reviews) => {
+                    if (active)
+                    {
+                        setReviewsCount(reviews.length);
+                    }
+                })
+                .catch(() => {
+                    // Si falla, simplemente no se muestra la cantidad.
+                });
+
+            return () => {
+                active = false;
+            };
+        }, [user])
+    );
 
     const navigation =
         useNavigation<AccountNavigation>();
@@ -116,6 +148,14 @@ export default function AccountScreen()
                             <Text style={styles.email} numberOfLines={1}>
                                 {user.email}
                             </Text>
+
+                            {reviewsCount !== null && reviewsCount > 0 && (
+                                <Text style={styles.reviewsCount}>
+                                    {reviewsCount === 1
+                                        ? '1 reseña escrita'
+                                        : `${reviewsCount} reseñas escritas`}
+                                </Text>
+                            )}
                         </View>
 
                         {user.avatarUrl ? (
@@ -212,6 +252,30 @@ export default function AccountScreen()
                             </Text>
                         </TouchableOpacity>
 
+                        <View style={styles.menuDivider} />
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                navigation.navigate('MyReviews');
+                            }}
+                        >
+                            <Ionicons
+                                name="star-outline"
+                                size={24}
+                                color="#6B3A22"
+                                style={styles.menuIcon}
+                            />
+
+                            <Text style={styles.menuText}>
+                                Mis reseñas
+                            </Text>
+
+                            <Text style={styles.chevron}>
+                                ›
+                            </Text>
+                        </TouchableOpacity>
+
                     </View>
 
                     <TouchableOpacity
@@ -279,7 +343,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 14,
         marginTop: 28,
-        padding: 18,
+        paddingHorizontal: 18,
+        // 4 menos que antes arriba y abajo: compensa la foto de 64 (era 56).
+        paddingVertical: 14,
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
         borderColor: '#E8D9C7',
@@ -338,6 +404,13 @@ const styles = StyleSheet.create({
         marginTop: 6,
         fontSize: 15,
         color: '#7A6254',
+    },
+
+    reviewsCount: {
+        marginTop: 4,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#6B3A22',
     },
 
     section: {

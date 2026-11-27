@@ -792,6 +792,49 @@ export type AddFavoriteData = {
     cafeLongitude: number;
 };
 
+export type MyReview = {
+    id: number;
+    rating: number;
+    comment: string;
+    createdAt: string;
+    cafe: {
+        googlePlaceId: string;
+        name: string;
+        address: string;
+    };
+};
+
+/** Reseñas del usuario, de la más nueva a la más vieja ("Mis reseñas"). */
+export async function getMyReviews(): Promise<MyReview[]>
+{
+    const token = await SecureStore.getItemAsync('auth_token');
+
+    if (!token)
+    {
+        throw new Error('Tenés que iniciar sesión para ver tus reseñas');
+    }
+
+    const response = await fetch(
+        `${API_URL}/users/me/reviews`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    await throwIfUnauthorized(response.status, token);
+
+    if (!response.ok)
+    {
+        throw new Error('No se pudieron obtener tus reseñas');
+    }
+
+    const data: { reviews: MyReview[] } = await response.json();
+
+    return data.reviews;
+}
+
 export async function getFavorites(): Promise<Favorite[]>
 {
     const token = await SecureStore.getItemAsync('auth_token');

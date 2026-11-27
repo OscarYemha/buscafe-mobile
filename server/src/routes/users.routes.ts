@@ -155,6 +155,53 @@ router.get(
     }
 );
 
+/*
+ * Reseñas del usuario, de la más nueva a la más vieja, con los datos del
+ * café para mostrarlas en "Mis reseñas". Se arma la respuesta campo por
+ * campo para no exponer datos internos de la reseña.
+ */
+router.get(
+    '/me/reviews',
+    requireAuth,
+    async (
+        req: AuthenticatedRequest,
+        res
+    ) => {
+        const userId = req.userId;
+
+        if (!userId)
+        {
+            return res.status(401).json({
+                error: 'Autenticación requerida',
+            });
+        }
+
+        const reviews = await prisma.review.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                cafe: {
+                    select: {
+                        googlePlaceId: true,
+                        name: true,
+                        address: true,
+                    },
+                },
+            },
+        });
+
+        return res.json({
+            reviews: reviews.map((review) => ({
+                id: review.id,
+                rating: review.rating,
+                comment: review.comment,
+                createdAt: review.createdAt,
+                cafe: review.cafe,
+            })),
+        });
+    }
+);
+
 router.patch(
     '/me',
     requireAuth,

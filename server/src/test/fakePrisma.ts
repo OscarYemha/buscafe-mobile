@@ -277,6 +277,21 @@ export const fakePrisma = {
             return row ? withCafe(row, include) : null;
         },
         create: async ({ data = {} }: Args) => ({ ...db.reviews.insert(data) }),
+        // Solo orderBy por createdAt (lo que usa GET /users/me/reviews).
+        findMany: async ({ where = {}, include, orderBy }: Args & { orderBy?: { createdAt?: 'asc' | 'desc' } }) =>
+        {
+            const direction = orderBy?.createdAt === 'asc' ? 1 : -1;
+
+            return db.reviews.rows
+                .filter((row) => matches(row, where))
+                .sort((a, b) =>
+                    direction * (
+                        (a.createdAt as Date).getTime() - (b.createdAt as Date).getTime() ||
+                        (a.id as number) - (b.id as number)
+                    )
+                )
+                .map((row) => withCafe(row, include));
+        },
     },
     favorite: {
         upsert: async ({ where = {}, create = {}, update = {}, include }: Args) =>
