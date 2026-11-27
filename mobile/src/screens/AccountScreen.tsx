@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
         gap: 14,
         marginTop: 28,
         paddingHorizontal: 18,
-        // 4 menos que antes arriba y abajo: compensa la foto de 64 (era 56).
+        // 4 menos que antes arriba y abajo: compensa la foto de 66 (era 56).
         paddingVertical: 14,
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
@@ -353,9 +353,9 @@ const styles = StyleSheet.create({
     },
 
     avatar: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 66,
+        height: 66,
+        borderRadius: 33,
     },
 
     avatarViewer: {
@@ -402,13 +402,13 @@ const styles = StyleSheet.create({
 
     email: {
         marginTop: 6,
-        fontSize: 15,
+        fontSize: 16,
         color: '#7A6254',
     },
 
     reviewsCount: {
         marginTop: 4,
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
         color: '#6B3A22',
     },
