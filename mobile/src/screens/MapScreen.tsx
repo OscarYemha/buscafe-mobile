@@ -56,42 +56,29 @@ const SEARCH_AREA_MIN_ZOOM_CHANGE = 0.35;
 const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 
 /*
- * Al seleccionar un café el mapa se centra con el pin más abajo (a un 70 %
- * de la altura), para dejar lugar arriba a la tarjeta. Si igual no entra
- * arriba, la tarjeta se muestra debajo del pin en vez de ocultarse.
+ * La tarjeta del café seleccionado es una vista flotante sobre el mapa,
+ * ubicada con la proyección real de Google (pointForCoordinate). Mientras
+ * el mapa se mueve (arrastre, zoom o centrado) se oculta, y aparece cuando
+ * se detiene: así no se la ve "arrastrarse" detrás del pin. (Las versiones
+ * nativas, Callout o marcador propio, quedaban invisibles a veces en
+ * Android: react-native-maps las convierte en imagen antes de dibujarlas.)
+ *
+ * Al seleccionar un café el mapa se centra con el pin por debajo del
+ * centro, para dejar lugar a la tarjeta. Si se está lejos hace un zoom
+ * suave hasta SELECTED_CAFE_DELTA; si ya se está cerca, solo centra. Si la
+ * tarjeta igual no entra arriba del pin, se muestra debajo.
  */
 const SELECTED_CAFE_DELTA = 0.01;
 const SELECTED_PIN_OFFSET = 0.2; // fracción de la altura bajo el centro
+const SELECT_ANIMATION_MS = 400;
+// Si el mapa no llega a moverse (ya estaba centrado), mostrar igual la tarjeta.
+const MOVE_SAFETY_TIMEOUT_MS = SELECT_ANIMATION_MS + 400;
+const REFOCUS_RECENTER_DELAY_MS = 250;
+
+const RECENTER_BUTTON_SIZE = 46;
+const RECENTER_BUTTON_MARGIN = 16;
 const POPUP_EDGE_MARGIN = 12;
 const POPUP_BELOW_GAP = 10;
-
-// Proyección de Mercator para acompañar el gesto sin esperar al puente nativo.
-function mercatorY(latitude: number): number
-{
-    const lat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
-    const radians = lat * Math.PI / 180;
-    return Math.log(Math.tan(Math.PI / 4 + radians / 2));
-}
-
-function projectCafe(
-    latitude: number,
-    longitude: number,
-    region: Region,
-    width: number,
-    height: number
-): MapPoint
-{
-    // Maneja el cruce del meridiano 180.
-    const diffLongitude = ((longitude - region.longitude + 540) % 360) - 180;
-    const top = mercatorY(region.latitude + region.latitudeDelta / 2);
-    const bottom = mercatorY(region.latitude - region.latitudeDelta / 2);
-    const spanY = top - bottom;
-    return {
-        x: width / 2 + (diffLongitude / region.longitudeDelta) * width,
-        y: spanY === 0 ? height / 2 :
-            (top - mercatorY(latitude)) / spanY * height,
-    };
-}
 
 type Props = CompositeScreenProps<
     BottomTabScreenProps<
@@ -120,6 +107,10 @@ export default function MapScreen(
     const [selectedCafeId, setSelectedCafeId] = useState<string | null>(null);
     const [exploredRegion, setExploredRegion] = useState<Region | null>(null);
     const [showSearchAreaButton, setShowSearchAreaButton] = useState(false);
+
+    // "Abiertos ahora": muestra solo los cafés que Google marca como abiertos
+    // (los sin horario conocido también se ocultan).
+    const [showOnlyOpen, setShowOnlyOpen] = useState(false);
 
     const searchAreaTimerRef =
         useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,7 +156,43 @@ export default function MapScreen(
     const currentRegionRef = useRef<Region | null>(null);
     const searchReferenceRegionRef = useRef<Region | null>(null);
     const projectionEpochRef = useRef(0);
-    const lastPopupUpdateRef = useRef(0);
+
+    // La tarjeta se oculta mientras el mapa se mueve.
+    const [isMapMoving, setIsMapMoving] = useState(false);
+    const isMapMovingRef = useRef(false);
+    const moveSafetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    function setMapMoving(moving: boolean)
+    {
+        if (moveSafetyTimerRef.current)
+        {
+            clearTimeout(moveSafetyTimerRef.current);
+            moveSafetyTimerRef.current = null;
+        }
+
+        if (isMapMovingRef.current !== moving)
+        {
+            isMapMovingRef.current = moving;
+            setIsMapMoving(moving);
+        }
+
+        if (moving)
+        {
+            // Descartar la posición calculada antes del movimiento (y las que
+            // estén en camino): al detenerse, la tarjeta aparecía un instante
+            // donde estaba el pin antes de centrar y saltaba a su lugar.
+            ++projectionEpochRef.current;
+            setPopupPoint(null);
+        }
+    }
+
+    useEffect(() => () =>
+    {
+        if (moveSafetyTimerRef.current)
+        {
+            clearTimeout(moveSafetyTimerRef.current);
+        }
+    }, []);
     const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
     const [popupHeight, setPopupHeight] = useState(0);
     const [popupPoint, setPopupPoint] = useState<(MapPoint & { id: string }) | null>(null);
@@ -175,20 +202,49 @@ export default function MapScreen(
      * pestaña), salvo que se haya ido al detalle de un café: al volver, el
      * café sigue seleccionado y la lista en el mismo lugar.
      */
-    const keepSelectionOnBlurRef = useRef(false);
+    // Café que estaba seleccionado al abrir su detalle: al volver se restaura.
+    const returningFromDetailRef = useRef<string | null>(null);
+    const returnToMyLocationRef = useRef<(animationMs?: number) => void>(() => undefined);
+    const refocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     function openCafeDetail(googlePlaceId: string)
     {
-        keepSelectionOnBlurRef.current = true;
+        returningFromDetailRef.current = googlePlaceId;
         navigation.navigate('CafeDetail', { googlePlaceId });
     }
 
     useFocusEffect(
         useCallback(() => {
-            return () => {
-                if (keepSelectionOnBlurRef.current)
+            const restoredCafeId = returningFromDetailRef.current;
+
+            if (restoredCafeId)
+            {
+                // Volviendo del detalle: mismo café seleccionado.
+                returningFromDetailRef.current = null;
+                setSelectedCafeId(restoredCafeId);
+            }
+            else
+            {
+                // Entrando desde otra pestaña: el mapa como la primera vez
+                // (centrado en el usuario, sin selección ni zona explorada).
+                // Después de la transición: con el mapa todavía oculto, Android
+                // ignora el movimiento de cámara.
+                refocusTimerRef.current = setTimeout(() =>
                 {
-                    keepSelectionOnBlurRef.current = false;
+                    refocusTimerRef.current = null;
+                    returnToMyLocationRef.current(0);
+                }, REFOCUS_RECENTER_DELAY_MS);
+            }
+
+            return () => {
+                if (refocusTimerRef.current)
+                {
+                    clearTimeout(refocusTimerRef.current);
+                    refocusTimerRef.current = null;
+                }
+
+                if (returningFromDetailRef.current)
+                {
                     return;
                 }
 
@@ -202,7 +258,32 @@ export default function MapScreen(
         }, [])
     );
 
-    const displayedCafes = explorationCafes ?? cafes;
+    const allCafes = explorationCafes ?? cafes;
+
+    const displayedCafes = showOnlyOpen
+        ? allCafes.filter((cafe) => cafe.isOpen === true)
+        : allCafes;
+
+    function toggleShowOnlyOpen()
+    {
+        const next = !showOnlyOpen;
+
+        // Si el café seleccionado queda oculto, se deselecciona.
+        if (next && selectedCafeId)
+        {
+            const selected = allCafes.find(
+                (cafe) => cafe.googlePlaceId === selectedCafeId
+            );
+
+            if (selected?.isOpen !== true)
+            {
+                setSelectedCafeId(null);
+                setPopupPoint(null);
+            }
+        }
+
+        setShowOnlyOpen(next);
+    }
 
     const selectedCafe = displayedCafes.find(
         cafe => cafe.googlePlaceId === selectedCafeId
@@ -262,22 +343,33 @@ export default function MapScreen(
         );
     }
 
-    // Calculamos solo la posición de la cafetería seleccionada.
-    // Al terminar el gesto, corregimos usando la proyección real de Google Maps.
-    function updatePopupPosition(region: Region, cafe: CafeSummary | null)
+    function focusCafe(cafe: CafeSummary)
     {
-        currentRegionRef.current = region;
-        ++projectionEpochRef.current;
-        if (!cafe || !mapSize.width || !mapSize.height)
+        const currentDelta =
+            currentRegionRef.current?.latitudeDelta ?? SELECTED_CAFE_DELTA;
+        const delta = Math.min(currentDelta, SELECTED_CAFE_DELTA);
+
+        programmaticMovementRef.current = true;
+
+        // Ocultar ya la tarjeta (no esperar el primer evento de movimiento),
+        // con un tope por si el mapa no llega a moverse.
+        setMapMoving(true);
+        moveSafetyTimerRef.current = setTimeout(() =>
         {
-            setPopupPoint(null);
-            return;
-        }
-        const point = projectCafe(
-            cafe.latitude, cafe.longitude,
-            region, mapSize.width, mapSize.height
+            moveSafetyTimerRef.current = null;
+            setMapMoving(false);
+            syncPopupWithNativeMap(cafe);
+        }, MOVE_SAFETY_TIMEOUT_MS);
+
+        mapRef.current?.animateToRegion(
+            {
+                latitude: cafe.latitude + delta * SELECTED_PIN_OFFSET,
+                longitude: cafe.longitude,
+                latitudeDelta: delta,
+                longitudeDelta: delta,
+            },
+            SELECT_ANIMATION_MS
         );
-        setPopupPoint({ ...point, id: cafe.googlePlaceId });
     }
 
     function syncPopupWithNativeMap(cafe: CafeSummary | null)
@@ -291,7 +383,7 @@ export default function MapScreen(
             latitude: cafe.latitude,
             longitude: cafe.longitude,
         }).then(point => {
-            if (projectionEpochRef.current !== epoch)
+            if (projectionEpochRef.current !== epoch || isMapMovingRef.current)
             {
                 return;
             }
@@ -301,15 +393,12 @@ export default function MapScreen(
         });
     }
 
+    // Al cambiar la selección, la tarjeta se ubica con la proyección real de
+    // Google (pointForCoordinate). Si el mapa se está centrando, queda oculta
+    // y se vuelve a ubicar cuando termina el movimiento.
     useEffect(() => {
-        if (currentRegionRef.current)
-        {
-            updatePopupPosition(currentRegionRef.current, selectedCafe);
-        }
-        else
-        {
-            setPopupPoint(null);
-        }
+        setPopupPoint(null);
+        syncPopupWithNativeMap(selectedCafe);
     }, [selectedCafeId, mapSize.width, mapSize.height]);
 
     useEffect(() => {
@@ -400,7 +489,7 @@ export default function MapScreen(
         }
     }
 
-    function returnToMyLocation()
+    function returnToMyLocation(animationMs = 350)
     {
         isExploringMapRef.current = false;
 
@@ -439,9 +528,12 @@ export default function MapScreen(
                 latitudeDelta: 0.02,
                 longitudeDelta: 0.02,
             },
-            350
+            animationMs
         );
     }
+
+    // El efecto de foco se define antes que esta función: la usa por ref.
+    returnToMyLocationRef.current = returnToMyLocation;
 
     const popupFitsAbove =
         popupPoint !== null &&
@@ -456,6 +548,7 @@ export default function MapScreen(
         popupFitsAbove ? 'above' : 'below';
 
     const isPopupVisible =
+        !isMapMoving &&
         selectedCafe !== null &&
         popupPoint !== null &&
         popupPoint.id === selectedCafe.googlePlaceId &&
@@ -483,16 +576,6 @@ export default function MapScreen(
             style={styles.container}
             edges={['left', 'right']}
         >
-            <View style={styles.header}>
-                <Text style={styles.title}>
-                    Mapa
-                </Text>
-
-                <Text style={styles.description}>
-                    Explorá cafeterías cerca de vos.
-                </Text>
-            </View>
-
             {loading && !userLocation && (
                 <View style={styles.center}>
                     <ActivityIndicator
@@ -589,6 +672,10 @@ export default function MapScreen(
                         showsUserLocation
                         showsMyLocationButton={false}
                         toolbarEnabled={false}
+                        moveOnMarkerPress={false}
+                        // Los +/- de Google irían abajo a la derecha, donde está
+                        // el botón de recentrar. El zoom se hace con dos dedos.
+                        zoomControlEnabled={false}
                         onPress={(event) => {
                             if (event.nativeEvent.action === 'marker-press') {
                                 return;
@@ -605,12 +692,10 @@ export default function MapScreen(
                                 cancelSearchAreaButtonTimer();
                             }
                             currentRegionRef.current = region;
-                            // Máximo ~30 actualizaciones/segundo durante el gesto.
-                            const now = Date.now();
-                            if (now - lastPopupUpdateRef.current >= 33)
+
+                            if (!isMapMovingRef.current)
                             {
-                                lastPopupUpdateRef.current = now;
-                                updatePopupPosition(region, selectedCafe);
+                                setMapMoving(true);
                             }
                         }}
                         onRegionChangeComplete={(
@@ -618,8 +703,9 @@ export default function MapScreen(
                             details
                         ) => {
                             isMapGestureActiveRef.current = false;
+                            currentRegionRef.current = region;
                             setExploredRegion(region);
-                            updatePopupPosition(region, selectedCafe);
+                            setMapMoving(false);
                             syncPopupWithNativeMap(selectedCafe);
 
                             if (details?.isGesture === true)
@@ -698,22 +784,7 @@ export default function MapScreen(
                                 const cafeId = cafe.googlePlaceId;
 
                                 setSelectedCafeId(cafeId);
-                                if (currentRegionRef.current)
-                                {
-                                    updatePopupPosition(currentRegionRef.current, cafe);
-                                }
-                                programmaticMovementRef.current = true;
-
-                                mapRef.current?.animateToRegion(
-                                    {
-                                        latitude: cafe.latitude +
-                                            SELECTED_CAFE_DELTA * SELECTED_PIN_OFFSET,
-                                        longitude: cafe.longitude,
-                                        latitudeDelta: SELECTED_CAFE_DELTA,
-                                        longitudeDelta: 0.01,
-                                    },
-                                    350
-                                );
+                                focusCafe(cafe);
 
                                 requestAnimationFrame(() =>
                                 {
@@ -834,13 +905,50 @@ export default function MapScreen(
                         pointerEvents="box-none"
                     >
                         <TouchableOpacity
-                            style={styles.recenterButton}
-                            onPress={returnToMyLocation}
+                            style={[
+                                styles.openNowChip,
+                                showOnlyOpen && styles.openNowChipActive,
+                            ]}
+                            onPress={toggleShowOnlyOpen}
+                            accessibilityRole="switch"
+                            accessibilityState={{ checked: showOnlyOpen }}
+                            accessibilityLabel="Mostrar solo cafés abiertos ahora"
+                        >
+                            <Ionicons
+                                name="time"
+                                size={14}
+                                color={showOnlyOpen ? '#FFFFFF' : '#6B3A22'}
+                            />
+                            <Text
+                                style={[
+                                    styles.openNowChipText,
+                                    showOnlyOpen && styles.openNowChipTextActive,
+                                ]}
+                            >
+                                Abiertos ahora
+                            </Text>
+                        </TouchableOpacity>
+
+                    </View>
+
+                    {/* Abajo a la derecha del mapa (no de la pantalla: la lista
+                        está en el mismo contenedor), como en Google Maps. */}
+                    {mapSize.height > 0 && (
+                        <TouchableOpacity
+                            style={[
+                                styles.recenterButton,
+                                {
+                                    top: mapSize.height -
+                                        RECENTER_BUTTON_SIZE -
+                                        RECENTER_BUTTON_MARGIN,
+                                },
+                            ]}
+                            onPress={() => returnToMyLocation()}
                             accessibilityLabel="Volver a mi ubicación"
                         >
                             <Ionicons name="locate" size={24} color="#6B3A22" />
                         </TouchableOpacity>
-                    </View>
+                    )}
                     {showSearchAreaButton && !explorationLoading && !selectedCafe && (
                         <View
                             style={styles.searchAreaContainer}
@@ -884,6 +992,13 @@ export default function MapScreen(
                         <FlatList
                             ref={listRef}
                             data={sortedCafes}
+                            ListEmptyComponent={
+                                showOnlyOpen && allCafes.length > 0 ? (
+                                    <Text style={styles.emptyListMessage}>
+                                        No hay cafés abiertos en esta zona.
+                                    </Text>
+                                ) : null
+                            }
                             onScrollToIndexFailed={(info) => {
                                 listRef.current?.scrollToOffset({
                                     offset:
@@ -928,18 +1043,7 @@ export default function MapScreen(
                                             cafe.googlePlaceId
                                         );
 
-                                        programmaticMovementRef.current = true;
-
-                                        mapRef.current?.animateToRegion(
-                                            {
-                                                latitude: cafe.latitude +
-                                                    SELECTED_CAFE_DELTA * SELECTED_PIN_OFFSET,
-                                                longitude: cafe.longitude,
-                                                latitudeDelta: SELECTED_CAFE_DELTA,
-                                                longitudeDelta: 0.01,
-                                            },
-                                            350
-                                        );
+                                        focusCafe(cafe);
                                     }}
                                 >
                                     <View style={styles.cafeMainInfo}>
@@ -1004,23 +1108,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8F1E7',
     },
 
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 5,
-        paddingBottom: 8,
-    },
 
-    title: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: '#4A2416',
-    },
 
-    description: {
-        marginTop: 6,
-        fontSize: 15,
-        color: '#7A6254',
-    },
 
     center: {
         flex: 1,
@@ -1235,7 +1324,7 @@ const styles = StyleSheet.create({
         left: 12,
         right: 12,
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         zIndex: 20,
     },
@@ -1256,12 +1345,49 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
 
-    recenterButton: {
-        marginLeft: 'auto',
+    openNowChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 11,
+        paddingVertical: 7,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#E8D9C7',
         backgroundColor: '#FFFFFF',
-        width: 46,
-        height: 46,
-        borderRadius: 23,
+        elevation: 4,
+    },
+
+    openNowChipActive: {
+        backgroundColor: '#6B3A22',
+        borderColor: '#6B3A22',
+    },
+
+    openNowChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6B3A22',
+    },
+
+    openNowChipTextActive: {
+        color: '#FFFFFF',
+    },
+
+    emptyListMessage: {
+        padding: 20,
+        textAlign: 'center',
+        fontSize: 14,
+        color: '#7A6254',
+    },
+
+    recenterButton: {
+        position: 'absolute',
+        right: 12,
+        zIndex: 20,
+        backgroundColor: '#FFFFFF',
+        width: RECENTER_BUTTON_SIZE,
+        height: RECENTER_BUTTON_SIZE,
+        borderRadius: RECENTER_BUTTON_SIZE / 2,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 4,
