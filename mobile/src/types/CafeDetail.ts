@@ -43,6 +43,12 @@ export type CafeDetail = CafeSummary & {
     goodForDateCount: number;
 
     // Opcionales: un server sin este cambio no los manda.
+    coffeeRatingsCount?: number;
+    foodRatingsCount?: number;
+    serviceRatingsCount?: number;
+    comfortRatingsCount?: number;
+    quietRatingsCount?: number;
+
     wifi?: AmenityStats;
     powerOutlets?: AmenityStats;
 

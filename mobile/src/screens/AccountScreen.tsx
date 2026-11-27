@@ -1,5 +1,7 @@
 import {
     Image,
+    Modal,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -7,6 +9,7 @@ import {
     View,
 } from 'react-native';
 
+import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -32,6 +35,9 @@ export default function AccountScreen()
         user,
         logout,
     } = useAuth();
+
+    // Ver la foto de perfil en grande.
+    const [isAvatarOpen, setIsAvatarOpen] = useState(false);
 
     const navigation =
         useNavigation<AccountNavigation>();
@@ -113,11 +119,17 @@ export default function AccountScreen()
                         </View>
 
                         {user.avatarUrl ? (
-                            <Image
-                                source={{ uri: user.avatarUrl }}
-                                style={styles.avatar}
-                                accessibilityLabel="Tu foto de perfil"
-                            />
+                            <TouchableOpacity
+                                onPress={() => setIsAvatarOpen(true)}
+                                activeOpacity={0.8}
+                                accessibilityRole="imagebutton"
+                                accessibilityLabel="Ver tu foto de perfil en grande"
+                            >
+                                <Image
+                                    source={{ uri: user.avatarUrl }}
+                                    style={styles.avatar}
+                                />
+                            </TouchableOpacity>
                         ) : (
                             <View style={[styles.avatar, styles.avatarFallback]}>
                                 <Text style={styles.avatarInitial}>
@@ -126,6 +138,32 @@ export default function AccountScreen()
                             </View>
                         )}
                     </View>
+
+                    {user.avatarUrl && (
+                        <Modal
+                            visible={isAvatarOpen}
+                            transparent
+                            animationType="fade"
+                            statusBarTranslucent
+                            onRequestClose={() => setIsAvatarOpen(false)}
+                        >
+                            <Pressable
+                                style={styles.avatarViewer}
+                                onPress={() => setIsAvatarOpen(false)}
+                                accessibilityLabel="Cerrar la foto"
+                            >
+                                <Image
+                                    source={{ uri: user.avatarUrl }}
+                                    style={styles.avatarLarge}
+                                    resizeMode="contain"
+                                />
+
+                                <View style={styles.avatarViewerClose}>
+                                    <Ionicons name="close" size={28} color="#FFFFFF" />
+                                </View>
+                            </Pressable>
+                        </Modal>
+                    )}
 
                     <View style={styles.section}>
                         <TouchableOpacity
@@ -249,9 +287,29 @@ const styles = StyleSheet.create({
     },
 
     avatar: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+    },
+
+    avatarViewer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.92)',
+        padding: 20,
+    },
+
+    avatarLarge: {
+        width: '100%',
+        aspectRatio: 1,
+        borderRadius: 16,
+    },
+
+    avatarViewerClose: {
+        position: 'absolute',
+        top: 48,
+        right: 20,
     },
 
     avatarFallback: {
@@ -261,7 +319,7 @@ const styles = StyleSheet.create({
     },
 
     avatarInitial: {
-        fontSize: 22,
+        fontSize: 25,
         fontWeight: '700',
         color: '#6B3A22',
     },

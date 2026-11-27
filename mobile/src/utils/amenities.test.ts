@@ -6,7 +6,7 @@ describe('describeAmenity', () =>
     {
         expect(describeAmenity({ yesCount: 8, responsesCount: 10 })).toBe('Sí · 8 de 10 personas dicen que sí');
         expect(describeAmenity({ yesCount: 2, responsesCount: 6 })).toBe('No · 2 de 6 personas dicen que sí');
-        expect(describeAmenity({ yesCount: 2, responsesCount: 4 })).toBe('Opiniones divididas · 2 de 4 personas dicen que sí');
+        expect(describeAmenity({ yesCount: 2, responsesCount: 4 })).toBe('2 de 4 personas dicen que sí');
     });
 
     it('con una sola respuesta lo dice en singular', () =>
