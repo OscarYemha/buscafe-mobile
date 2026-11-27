@@ -39,6 +39,7 @@ import {
     RootStackParamlist,
 } from '../navigation/AppNavigator';
 import { getOpenStatus } from '../utils/openStatus';
+import VegetarianBadge from '../components/VegetarianBadge';
 
 
 type MapPoint = { x: number; y: number };
@@ -901,15 +902,23 @@ export default function MapScreen(
                                     <Ionicons name="location" size={12} color="#7A6254" />
                                     {' '}{selectedCafe.shortAddress}
                                 </Text>
-                                {selectedCafeStatus && (
-                                    <Text
-                                        style={[
-                                            styles.popupStatus,
-                                            { color: selectedCafeStatus.color },
-                                        ]}
-                                    >
-                                        ● {selectedCafeStatus.label}
-                                    </Text>
+                                {(selectedCafeStatus || selectedCafe.servesVegetarianFood === true) && (
+                                    <View style={styles.popupStatusRow}>
+                                        {selectedCafeStatus && (
+                                            <Text
+                                                style={[
+                                                    styles.popupStatus,
+                                                    { color: selectedCafeStatus.color },
+                                                ]}
+                                            >
+                                                ● {selectedCafeStatus.label}
+                                            </Text>
+                                        )}
+                                        <VegetarianBadge
+                                            servesVegetarianFood={selectedCafe.servesVegetarianFood}
+                                            compact
+                                        />
+                                    </View>
                                 )}
                                 <View style={styles.popupDivider} />
                                 <View style={styles.popupRatingRow}>
@@ -1107,6 +1116,15 @@ export default function MapScreen(
                                                 ? cafe.buscafeRating.toFixed(1)
                                                 : 'Sin valoraciones'}
                                         </Text>
+
+                                        {cafe.servesVegetarianFood === true && (
+                                            <View style={styles.cafeBadge}>
+                                                <VegetarianBadge
+                                                    servesVegetarianFood
+                                                    compact
+                                                />
+                                            </View>
+                                        )}
                                     </View>
 
                                     <View style={styles.cafeSideInfo}>
@@ -1205,7 +1223,14 @@ const styles = StyleSheet.create({
     },
     popupCoffee: { marginLeft: 8 },
     popupAddress: { marginTop: 5, color: '#7A6254', fontSize: 12 },
-    popupStatus: { marginTop: 4, fontSize: 12, fontWeight: '700' },
+    popupStatusRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 4,
+    },
+    popupStatus: { fontSize: 12, fontWeight: '700' },
     popupDivider: {
         height: 1,
         backgroundColor: '#E8D9C7',
@@ -1311,6 +1336,10 @@ const styles = StyleSheet.create({
         marginTop: 5,
         fontSize: 12,
         color: '#7A6254',
+    },
+
+    cafeBadge: {
+        marginTop: 5,
     },
 
     cafeDistance: {
