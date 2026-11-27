@@ -102,6 +102,16 @@ export default function AccountScreen()
                     </Text>
 
                     <View style={styles.userCard}>
+                        <View style={styles.userInfo}>
+                            <Text style={styles.name} numberOfLines={1}>
+                                {user.name}
+                            </Text>
+
+                            <Text style={styles.email} numberOfLines={1}>
+                                {user.email}
+                            </Text>
+                        </View>
+
                         {user.avatarUrl ? (
                             <Image
                                 source={{ uri: user.avatarUrl }}
@@ -115,16 +125,6 @@ export default function AccountScreen()
                                 </Text>
                             </View>
                         )}
-
-                        <View style={styles.userInfo}>
-                            <Text style={styles.name} numberOfLines={1}>
-                                {user.name}
-                            </Text>
-
-                            <Text style={styles.email} numberOfLines={1}>
-                                {user.email}
-                            </Text>
-                        </View>
                     </View>
 
                     <View style={styles.section}>
