@@ -16,10 +16,19 @@ export type CafeReview = {
     goodForStudy: boolean | null;
     goodForDate: boolean | null;
 
+    hasWifi: boolean | null;
+    hasPowerOutlets: boolean | null;
+
     user: {
         id: number;
         name: string;
     } | null;
+};
+
+/** Respuestas de la comunidad a una pregunta de sí o no (Wi-Fi, enchufes). */
+export type AmenityStats = {
+    yesCount: number;
+    responsesCount: number;
 };
 
 export type CafeStats = {
@@ -47,8 +56,16 @@ export type CafeStats = {
     coffeeRatingsCount: number;
     foodRatingsCount: number;
 
+    wifi: AmenityStats;
+    powerOutlets: AmenityStats;
+
     reviews: CafeReview[];
 };
+
+export const countAnswers = (values: Array<boolean | null>): AmenityStats => ({
+    yesCount: values.filter((value) => value === true).length,
+    responsesCount: values.filter((value) => value !== null).length,
+});
 
 export async function getCafeStats(
     googlePlaceId: string
@@ -77,6 +94,9 @@ export async function getCafeStats(
                     goodForWork: true,
                     goodForStudy: true,
                     goodForDate: true,
+
+                    hasWifi: true,
+                    hasPowerOutlets: true,
 
                     user: {
                         select: {
@@ -115,6 +135,9 @@ export async function getCafeStats(
 
             coffeeRatingsCount: 0,
             foodRatingsCount: 0,
+
+            wifi: { yesCount: 0, responsesCount: 0 },
+            powerOutlets: { yesCount: 0, responsesCount: 0 },
 
             reviews: [],
         };
@@ -269,6 +292,14 @@ export async function getCafeStats(
             cafe.reviews.filter(
                 review => review.foodRating !== null
             ).length,
+
+        wifi: countAnswers(
+            cafe.reviews.map((review) => review.hasWifi)
+        ),
+
+        powerOutlets: countAnswers(
+            cafe.reviews.map((review) => review.hasPowerOutlets)
+        ),
 
         reviews:
             cafe.reviews,

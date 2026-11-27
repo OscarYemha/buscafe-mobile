@@ -236,6 +236,53 @@ describe('POST /reviews: idempotencia', () =>
     });
 });
 
+describe('POST /reviews: Wi-Fi y enchufes', () =>
+{
+    it('guarda las respuestas de Wi-Fi y enchufes', async () =>
+    {
+        const user = await createUser();
+        seedExistingCafe();
+
+        const res = await post('/reviews', user.token, reviewBody(EXISTING_PLACE_ID, {
+            hasWifi: true,
+            hasPowerOutlets: false,
+        }));
+
+        expect(res.status).toBe(201);
+        expect(db.reviews.rows[0]).toMatchObject({ hasWifi: true, hasPowerOutlets: false });
+    });
+
+    it('son opcionales: sin responderlas quedan en null', async () =>
+    {
+        const user = await createUser();
+        seedExistingCafe();
+
+        const res = await post('/reviews', user.token, reviewBody(EXISTING_PLACE_ID));
+
+        expect(res.status).toBe(201);
+        expect(db.reviews.rows[0]).toMatchObject({ hasWifi: null, hasPowerOutlets: null });
+    });
+
+    it('400 si no son sí o no', async () =>
+    {
+        const user = await createUser();
+        seedExistingCafe();
+
+        expect((await post('/reviews', user.token, reviewBody(EXISTING_PLACE_ID, { hasWifi: 'sí' }))).status).toBe(400);
+        expect((await post('/reviews', user.token, reviewBody(EXISTING_PLACE_ID, { hasPowerOutlets: 1 }))).status).toBe(400);
+        expect(db.reviews.rows).toHaveLength(0);
+    });
+
+    it('reintentar con la misma clave pero otra respuesta de Wi-Fi da 409', async () =>
+    {
+        const user = await createUser();
+        const idempotencyKey = '3c7f1dd0-5b6f-4c9a-8a2f-2d3e4f5a6b7c';
+
+        expect((await post('/reviews', user.token, reviewBody(NEW_PLACE_ID, { idempotencyKey, hasWifi: true }))).status).toBe(201);
+        expect((await post('/reviews', user.token, reviewBody(NEW_PLACE_ID, { idempotencyKey, hasWifi: false }))).status).toBe(409);
+    });
+});
+
 describe('POST /favorites', () =>
 {
     it('devuelve el favorito con el café de la base', async () =>

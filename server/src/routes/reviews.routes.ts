@@ -52,6 +52,8 @@ router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedReq
             goodForWork,
             goodForStudy,
             goodForDate,
+            hasWifi,
+            hasPowerOutlets,
             idempotencyKey,
         } = req.body;
 
@@ -74,6 +76,8 @@ router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedReq
             !isOptionalBoolean(goodForWork) ||
             !isOptionalBoolean(goodForStudy) ||
             !isOptionalBoolean(goodForDate) ||
+            !isOptionalBoolean(hasWifi) ||
+            !isOptionalBoolean(hasPowerOutlets) ||
             (
                 idempotencyKey !== undefined &&
                 (
@@ -114,6 +118,8 @@ router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedReq
                 goodForWork: boolean | null;
                 goodForStudy: boolean | null;
                 goodForDate: boolean | null;
+                hasWifi: boolean | null;
+                hasPowerOutlets: boolean | null;
             }
         ): boolean =>
         {
@@ -129,7 +135,9 @@ router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedReq
                 existing.quietRating === (quietRating ?? null) &&
                 existing.goodForWork === (goodForWork ?? null) &&
                 existing.goodForStudy === (goodForStudy ?? null) &&
-                existing.goodForDate === (goodForDate ?? null)
+                existing.goodForDate === (goodForDate ?? null) &&
+                existing.hasWifi === (hasWifi ?? null) &&
+                existing.hasPowerOutlets === (hasPowerOutlets ?? null)
             );
         };
 
@@ -211,6 +219,8 @@ router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedReq
                     goodForWork,
                     goodForStudy,
                     goodForDate,
+                    hasWifi,
+                    hasPowerOutlets,
                     idempotencyKey,
                 },
             });

@@ -187,6 +187,8 @@ export const db = {
         goodForWork: null,
         goodForStudy: null,
         goodForDate: null,
+        hasWifi: null,
+        hasPowerOutlets: null,
         idempotencyKey: null,
         userId: null,
     })),
