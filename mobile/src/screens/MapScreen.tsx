@@ -2,7 +2,6 @@ import {
     ActivityIndicator,
     FlatList,
     Linking,
-    PixelRatio,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -41,7 +40,10 @@ import {
 import { getOpenStatus } from '../utils/openStatus';
 
 
+type MapPoint = { x: number; y: number };
+
 const CARD_WIDTH = 252;
+const PIN_VERTICAL_OFFSET = 36;
 
 /*
  * "Buscar en esta zona": aparece si el mapa se movió al menos un 30 % de
@@ -54,30 +56,29 @@ const SEARCH_AREA_MIN_ZOOM_CHANGE = 0.35;
 const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 
 /*
- * La tarjeta del café seleccionado es un marcador propio, en las mismas
- * coordenadas y apoyado sobre el pin: lo mueve Google Maps, así que queda
- * anclada al arrastrar, hacer zoom o centrar. No se usa el Callout nativo:
- * en Android react-native-maps guarda el tamaño de la tarjeta la primera vez
- * que se abre y, si todavía no estaba medida, queda en 0x0 (abierta pero
- * invisible).
+ * La tarjeta del café seleccionado es una vista flotante sobre el mapa,
+ * ubicada con la proyección real de Google (pointForCoordinate). Mientras
+ * el mapa se mueve (arrastre, zoom o centrado) se oculta, y aparece cuando
+ * se detiene: así no se la ve "arrastrarse" detrás del pin. (Las versiones
+ * nativas, Callout o marcador propio, quedaban invisibles a veces en
+ * Android: react-native-maps las convierte en imagen antes de dibujarlas.)
  *
- * Al seleccionar un café el mapa se centra en él con el pin un poco por
- * debajo del centro, para dejar lugar a la tarjeta. Si se está lejos hace
- * un zoom suave hasta SELECTED_CAFE_DELTA; si ya se está cerca, solo centra.
+ * Al seleccionar un café el mapa se centra con el pin por debajo del
+ * centro, para dejar lugar a la tarjeta. Si se está lejos hace un zoom
+ * suave hasta SELECTED_CAFE_DELTA; si ya se está cerca, solo centra. Si la
+ * tarjeta igual no entra arriba del pin, se muestra debajo.
  */
 const SELECTED_CAFE_DELTA = 0.01;
-const SELECTED_PIN_OFFSET = 0.15; // fracción de la altura bajo el centro
+const SELECTED_PIN_OFFSET = 0.2; // fracción de la altura bajo el centro
 const SELECT_ANIMATION_MS = 400;
-// La imagen del pin seleccionado mide 67 px: la tarjeta se apoya encima.
-const SELECTED_PIN_HEIGHT_DP = 67 / PixelRatio.get();
-
-// Capas: pines < ubicación del usuario < tarjeta.
-const USER_DOT_Z_INDEX = 2000;
-const CARD_Z_INDEX = 3000;
+// Si el mapa no llega a moverse (ya estaba centrado), mostrar igual la tarjeta.
+const MOVE_SAFETY_TIMEOUT_MS = SELECT_ANIMATION_MS + 400;
 const REFOCUS_RECENTER_DELAY_MS = 250;
 
 const RECENTER_BUTTON_SIZE = 46;
 const RECENTER_BUTTON_MARGIN = 16;
+const POPUP_EDGE_MARGIN = 12;
+const POPUP_BELOW_GAP = 10;
 
 type Props = CompositeScreenProps<
     BottomTabScreenProps<
@@ -154,34 +155,45 @@ export default function MapScreen(
     const explorationRequestIdRef = useRef(0);
     const currentRegionRef = useRef<Region | null>(null);
     const searchReferenceRegionRef = useRef<Region | null>(null);
-    const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+    const projectionEpochRef = useRef(0);
 
-    function focusCafe(cafe: CafeSummary)
+    // La tarjeta se oculta mientras el mapa se mueve.
+    const [isMapMoving, setIsMapMoving] = useState(false);
+    const isMapMovingRef = useRef(false);
+    const moveSafetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    function setMapMoving(moving: boolean)
     {
-        const currentDelta =
-            currentRegionRef.current?.latitudeDelta ?? SELECTED_CAFE_DELTA;
-        const delta = Math.min(currentDelta, SELECTED_CAFE_DELTA);
+        if (moveSafetyTimerRef.current)
+        {
+            clearTimeout(moveSafetyTimerRef.current);
+            moveSafetyTimerRef.current = null;
+        }
 
-        programmaticMovementRef.current = true;
-
-        mapRef.current?.animateToRegion(
-            {
-                latitude: cafe.latitude + delta * SELECTED_PIN_OFFSET,
-                longitude: cafe.longitude,
-                latitudeDelta: delta,
-                longitudeDelta: delta,
-            },
-            SELECT_ANIMATION_MS
-        );
+        if (isMapMovingRef.current !== moving)
+        {
+            isMapMovingRef.current = moving;
+            setIsMapMoving(moving);
+        }
     }
+
+    useEffect(() => () =>
+    {
+        if (moveSafetyTimerRef.current)
+        {
+            clearTimeout(moveSafetyTimerRef.current);
+        }
+    }, []);
+    const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+    const [popupHeight, setPopupHeight] = useState(0);
+    const [popupPoint, setPopupPoint] = useState<(MapPoint & { id: string }) | null>(null);
 
     /*
      * Al salir del mapa se limpia la selección (por ejemplo, al cambiar de
      * pestaña), salvo que se haya ido al detalle de un café: al volver, el
      * café sigue seleccionado y la lista en el mismo lugar.
      */
-    // Café que estaba seleccionado al abrir su detalle: al volver se
-    // restaura (y se reabre su tarjeta), pase lo que pase en el medio.
+    // Café que estaba seleccionado al abrir su detalle: al volver se restaura.
     const returningFromDetailRef = useRef<string | null>(null);
     const returnToMyLocationRef = useRef<(animationMs?: number) => void>(() => undefined);
     const refocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -198,7 +210,7 @@ export default function MapScreen(
 
             if (restoredCafeId)
             {
-                // Volviendo del detalle: mismo café seleccionado y su tarjeta.
+                // Volviendo del detalle: mismo café seleccionado.
                 returningFromDetailRef.current = null;
                 setSelectedCafeId(restoredCafeId);
             }
@@ -257,6 +269,7 @@ export default function MapScreen(
             if (selected?.isOpen !== true)
             {
                 setSelectedCafeId(null);
+                setPopupPoint(null);
             }
         }
 
@@ -266,6 +279,10 @@ export default function MapScreen(
     const selectedCafe = displayedCafes.find(
         cafe => cafe.googlePlaceId === selectedCafeId
     ) ?? null;
+
+    const selectedCafeStatus = selectedCafe
+        ? getOpenStatus(selectedCafe.isOpen)
+        : null;
 
     const sortedCafes = [...displayedCafes].sort((a, b) => {
         if (a.distanceKm === null && b.distanceKm === null)
@@ -316,6 +333,64 @@ export default function MapScreen(
             zoomOut >= SEARCH_AREA_MIN_ZOOM_CHANGE
         );
     }
+
+    function focusCafe(cafe: CafeSummary)
+    {
+        const currentDelta =
+            currentRegionRef.current?.latitudeDelta ?? SELECTED_CAFE_DELTA;
+        const delta = Math.min(currentDelta, SELECTED_CAFE_DELTA);
+
+        programmaticMovementRef.current = true;
+
+        // Ocultar ya la tarjeta (no esperar el primer evento de movimiento),
+        // con un tope por si el mapa no llega a moverse.
+        setMapMoving(true);
+        moveSafetyTimerRef.current = setTimeout(() =>
+        {
+            moveSafetyTimerRef.current = null;
+            setMapMoving(false);
+            syncPopupWithNativeMap(cafe);
+        }, MOVE_SAFETY_TIMEOUT_MS);
+
+        mapRef.current?.animateToRegion(
+            {
+                latitude: cafe.latitude + delta * SELECTED_PIN_OFFSET,
+                longitude: cafe.longitude,
+                latitudeDelta: delta,
+                longitudeDelta: delta,
+            },
+            SELECT_ANIMATION_MS
+        );
+    }
+
+    function syncPopupWithNativeMap(cafe: CafeSummary | null)
+    {
+        if (!cafe || !mapRef.current)
+        {
+            return;
+        }
+        const epoch = ++projectionEpochRef.current;
+        void mapRef.current.pointForCoordinate({
+            latitude: cafe.latitude,
+            longitude: cafe.longitude,
+        }).then(point => {
+            if (projectionEpochRef.current !== epoch)
+            {
+                return;
+            }
+            setPopupPoint({ ...point, id: cafe.googlePlaceId });
+        }).catch(error => {
+            console.warn('No se pudo proyectar el pin seleccionado:', error);
+        });
+    }
+
+    // Al cambiar la selección, la tarjeta se ubica con la proyección real de
+    // Google (pointForCoordinate). Si el mapa se está centrando, queda oculta
+    // y se vuelve a ubicar cuando termina el movimiento.
+    useEffect(() => {
+        setPopupPoint(null);
+        syncPopupWithNativeMap(selectedCafe);
+    }, [selectedCafeId, mapSize.width, mapSize.height]);
 
     useEffect(() => {
         if (
@@ -371,6 +446,7 @@ export default function MapScreen(
 
             setExplorationCafes(nearbyCafes);
             setSelectedCafeId(null);
+            setPopupPoint(null);
 
             searchReferenceRegionRef.current = exploredRegion;
 
@@ -406,7 +482,6 @@ export default function MapScreen(
 
     function returnToMyLocation(animationMs = 350)
     {
-
         isExploringMapRef.current = false;
 
         ++explorationRequestIdRef.current;
@@ -451,58 +526,28 @@ export default function MapScreen(
     // El efecto de foco se define antes que esta función: la usa por ref.
     returnToMyLocationRef.current = returnToMyLocation;
 
-    function renderCafeCard(cafe: CafeSummary)
-    {
-        const status = getOpenStatus(cafe.isOpen);
+    const popupFitsAbove =
+        popupPoint !== null &&
+        popupPoint.y - PIN_VERTICAL_OFFSET - popupHeight >= POPUP_EDGE_MARGIN;
 
-        return (
-            <View style={styles.cardMarker}>
-                <View style={styles.popupCard}>
-                    <View style={styles.popupTitleRow}>
-                        <Text style={styles.popupTitle} numberOfLines={2}>
-                            {cafe.name}
-                        </Text>
-                        <Ionicons
-                            name="cafe"
-                            size={18}
-                            color="#6B3A22"
-                            style={styles.popupCoffee}
-                        />
-                    </View>
-                    <Text style={styles.popupAddress} numberOfLines={1}>
-                        <Ionicons name="location" size={12} color="#7A6254" />
-                        {' '}{cafe.shortAddress}
-                    </Text>
-                    {status && (
-                        <Text style={[styles.popupStatus, { color: status.color }]}>
-                            ● {status.label}
-                        </Text>
-                    )}
-                    <View style={styles.popupDivider} />
-                    <View style={styles.popupRatingRow}>
-                        <View style={styles.popupRatingColumn}>
-                            <Text style={styles.popupRatingLabel}>Google</Text>
-                            <Text style={styles.popupRatingValue}>
-                                ★ {cafe.googleRating !== null
-                                    ? cafe.googleRating.toFixed(1)
-                                    : 'Sin valoraciones'}
-                            </Text>
-                        </View>
-                        <View style={styles.popupRatingColumn}>
-                            <Text style={styles.popupRatingLabel}>BusCafé</Text>
-                            <Text style={styles.popupRatingValue}>
-                                {cafe.buscafeRating !== null
-                                    ? `★ ${cafe.buscafeRating.toFixed(1)}`
-                                    : 'Sin valoraciones'}
-                            </Text>
-                        </View>
-                        <Text style={styles.popupChevron}>›</Text>
-                    </View>
-                </View>
-                <View style={styles.popupTail} />
-            </View>
-        );
-    }
+    const popupFitsBelow =
+        popupPoint !== null &&
+        popupPoint.y + POPUP_BELOW_GAP + popupHeight <=
+            mapSize.height - POPUP_EDGE_MARGIN;
+
+    const popupPlacement: 'above' | 'below' =
+        popupFitsAbove ? 'above' : 'below';
+
+    const isPopupVisible =
+        !isMapMoving &&
+        selectedCafe !== null &&
+        popupPoint !== null &&
+        popupPoint.id === selectedCafe.googlePlaceId &&
+        popupHeight > 0 &&
+        popupPoint.x >= 0 &&
+        popupPoint.x <= mapSize.width &&
+        popupPoint.y <= mapSize.height &&
+        (popupFitsAbove || popupFitsBelow);
 
     useEffect(() => {
         if (!userLocation || searchReferenceRegionRef.current) {
@@ -615,7 +660,7 @@ export default function MapScreen(
                             latitudeDelta: 0.02,
                             longitudeDelta: 0.02,
                         }}
-                        showsUserLocation={false}
+                        showsUserLocation
                         showsMyLocationButton={false}
                         toolbarEnabled={false}
                         moveOnMarkerPress={false}
@@ -628,6 +673,7 @@ export default function MapScreen(
                             }
 
                             setSelectedCafeId(null);
+                            setPopupPoint(null);
                         }}
                         onRegionChange={(region, details) =>
                         {
@@ -637,6 +683,11 @@ export default function MapScreen(
                                 cancelSearchAreaButtonTimer();
                             }
                             currentRegionRef.current = region;
+
+                            if (!isMapMovingRef.current)
+                            {
+                                setMapMoving(true);
+                            }
                         }}
                         onRegionChangeComplete={(
                             region,
@@ -645,6 +696,8 @@ export default function MapScreen(
                             isMapGestureActiveRef.current = false;
                             currentRegionRef.current = region;
                             setExploredRegion(region);
+                            setMapMoving(false);
+                            syncPopupWithNativeMap(selectedCafe);
 
                             if (details?.isGesture === true)
                             {
@@ -680,6 +733,7 @@ export default function MapScreen(
                                     setExplorationError(null);
 
                                     setSelectedCafeId(null);
+                                    setPopupPoint(null);
                                     showSearchAreaButtonAfterDelay();
                                 }
                                 else
@@ -691,28 +745,17 @@ export default function MapScreen(
                         }}
                     >
 
-                    {/* Ubicación del usuario como pin propio (el puntito nativo de
-                        Google se dibuja por encima de todo): queda arriba de los
-                        pines pero debajo de la tarjeta. */}
-                    {userLocation && (
-                        <Marker
-                            coordinate={{
-                                latitude: userLocation.latitude,
-                                longitude: userLocation.longitude,
-                            }}
-                            anchor={{ x: 0.5, y: 0.5 }}
-                            tappable={false}
-                            zIndex={USER_DOT_Z_INDEX}
-                        >
-                            <View style={styles.userDot}>
-                                <View style={styles.userDotInner} />
-                            </View>
-                        </Marker>
-                    )}
-
                     {sortedCafes.map((cafe) => (
                         <Marker
-                            key={cafe.googlePlaceId}
+                            // La key cambia con la selección para recrear el
+                            // marcador: en Android, Google Maps no aplica un
+                            // zIndex nuevo a un marcador ya dibujado, y el pin
+                            // elegido desde la lista quedaba debajo del resto.
+                            key={
+                                selectedCafeId === cafe.googlePlaceId
+                                    ? `${cafe.googlePlaceId}-selected`
+                                    : cafe.googlePlaceId
+                            }
                             image={
                                 selectedCafeId === cafe.googlePlaceId
                                     ? require('../../assets/cafe-marker-selected.png')
@@ -756,22 +799,97 @@ export default function MapScreen(
                         />
                     ))}
 
-                    {selectedCafe && (
-                        <Marker
-                            key={`card-${selectedCafe.googlePlaceId}`}
-                            coordinate={{
-                                latitude: selectedCafe.latitude,
-                                longitude: selectedCafe.longitude,
-                            }}
-                            anchor={{ x: 0.5, y: 1 }}
-                            zIndex={CARD_Z_INDEX}
-                            onPress={() => openCafeDetail(selectedCafe.googlePlaceId)}
-                        >
-                            {renderCafeCard(selectedCafe)}
-                        </Marker>
-                    )}
-
                     </MapView>
+
+                    {selectedCafe && popupPoint?.id === selectedCafe.googlePlaceId &&
+                        popupPoint.x >= 0 && popupPoint.x <= mapSize.width &&
+                        popupPoint.y >= 0 && popupPoint.y <= mapSize.height && (
+                        <View
+                            pointerEvents={isPopupVisible ? 'box-none' : 'none'}
+                            style={[
+                                styles.popupAnchor,
+                                {
+                                    left: popupPoint.x - CARD_WIDTH / 2,
+                                    ...(popupPlacement === 'above'
+                                        ? {
+                                            top: popupPoint.y - PIN_VERTICAL_OFFSET,
+                                            transform: [{ translateY: -popupHeight }],
+                                        }
+                                        : {
+                                            top: popupPoint.y + POPUP_BELOW_GAP,
+                                        }),
+                                    opacity: isPopupVisible ? 1 : 0,
+                                },
+                            ]}
+                            onLayout={event => {
+                                const height = event.nativeEvent.layout.height;
+                                if (Math.abs(height - popupHeight) > 1)
+                                {
+                                    setPopupHeight(height);
+                                }
+                            }}
+                        >
+                            {popupPlacement === 'below' && (
+                                <View style={styles.popupTailUp} />
+                            )}
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Ver detalles de ${selectedCafe.name}`}
+                                style={styles.popupCard}
+                                onPress={() => openCafeDetail(selectedCafe.googlePlaceId)}
+                            >
+                                <View style={styles.popupTitleRow}>
+                                    <Text style={styles.popupTitle} numberOfLines={2}>
+                                        {selectedCafe.name}
+                                    </Text>
+                                    <Ionicons
+                                        name="cafe"
+                                        size={18}
+                                        color="#6B3A22"
+                                        style={styles.popupCoffee}
+                                    />
+                                </View>
+                                <Text style={styles.popupAddress} numberOfLines={1}>
+                                    <Ionicons name="location" size={12} color="#7A6254" />
+                                    {' '}{selectedCafe.shortAddress}
+                                </Text>
+                                {selectedCafeStatus && (
+                                    <Text
+                                        style={[
+                                            styles.popupStatus,
+                                            { color: selectedCafeStatus.color },
+                                        ]}
+                                    >
+                                        ● {selectedCafeStatus.label}
+                                    </Text>
+                                )}
+                                <View style={styles.popupDivider} />
+                                <View style={styles.popupRatingRow}>
+                                    <View style={styles.popupRatingColumn}>
+                                        <Text style={styles.popupRatingLabel}>Google</Text>
+                                        <Text style={styles.popupRatingValue}>
+                                            ★ {selectedCafe.googleRating !== null
+                                                ? selectedCafe.googleRating.toFixed(1)
+                                                : 'Sin valoraciones'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.popupRatingColumn}>
+                                        <Text style={styles.popupRatingLabel}>BusCafé</Text>
+                                        <Text style={styles.popupRatingValue}>
+                                            {selectedCafe.buscafeRating !== null
+                                                ? `★ ${selectedCafe.buscafeRating.toFixed(1)}`
+                                                : 'Sin valoraciones'}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.popupChevron}>›</Text>
+                                </View>
+                            </TouchableOpacity>
+                            {popupPlacement === 'above' && (
+                                <View style={styles.popupTail} />
+                            )}
+                        </View>
+                    )}
 
                     <View
                         style={styles.mapControls}
@@ -915,6 +1033,7 @@ export default function MapScreen(
                                         setSelectedCafeId(
                                             cafe.googlePlaceId
                                         );
+
                                         focusCafe(cafe);
                                     }}
                                 >
@@ -1010,27 +1129,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
-    userDot: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 3,
-    },
-
-    userDotInner: {
-        width: 13,
-        height: 13,
-        borderRadius: 6.5,
-        backgroundColor: '#4285F4',
-    },
-
-    cardMarker: {
+    popupAnchor: {
+        position: 'absolute',
         width: CARD_WIDTH,
         alignItems: 'center',
-        paddingBottom: SELECTED_PIN_HEIGHT_DP,
+        zIndex: 10,
+        elevation: 10,
     },
     popupCard: {
         width: CARD_WIDTH,
@@ -1082,6 +1186,16 @@ const styles = StyleSheet.create({
         borderColor: '#E8D9C7',
         transform: [{ rotate: '45deg' }],
         marginTop: -7,
+    },
+    popupTailUp: {
+        width: 12,
+        height: 12,
+        backgroundColor: '#FFFFFF',
+        borderLeftWidth: 1,
+        borderTopWidth: 1,
+        borderColor: '#E8D9C7',
+        transform: [{ rotate: '45deg' }],
+        marginBottom: -7,
     },
 
     selectedCafeName: {
