@@ -29,4 +29,5 @@ export type CafeSummary = {
     priceLevel: number | null;
     isOpen: boolean | null;
     allowsDogs: boolean | null;
+    servesVegetarianFood: boolean | null;
 };

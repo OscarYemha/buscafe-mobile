@@ -7,6 +7,7 @@ import {
 import { priceLabels } from '../utils/price';
 import { CafeSummary } from '../types/CafeSummary';
 import { formatDistance } from '../utils/distance';
+import VegetarianBadge from './VegetarianBadge';
 
 type Props = {
     cafe: CafeSummary;
@@ -112,18 +113,22 @@ export default function NearbyCafeCard({
                 </Text>
             </View>
 
-            <Text
-                style={[
-                    styles.status,
-                    cafe.isOpen === true
-                        ? styles.open
-                        : cafe.isOpen === false
-                            ? styles.closed
-                            : styles.unknown,
-                ]}
-            >
-                {openLabel}
-            </Text>
+            <View style={styles.statusRow}>
+                <Text
+                    style={[
+                        styles.status,
+                        cafe.isOpen === true
+                            ? styles.open
+                            : cafe.isOpen === false
+                                ? styles.closed
+                                : styles.unknown,
+                    ]}
+                >
+                    {openLabel}
+                </Text>
+
+                <VegetarianBadge servesVegetarianFood={cafe.servesVegetarianFood} />
+            </View>
         </TouchableOpacity>
     );
 }
@@ -180,8 +185,15 @@ const styles = StyleSheet.create({
         color: '#7A6254',
     },
 
-    status: {
+    statusRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 10,
         marginTop: 10,
+    },
+
+    status: {
         fontSize: 14,
         fontWeight: '600',
     },

@@ -32,6 +32,7 @@ export function makeCafe(overrides: Partial<CafeSummary> = {}): CafeSummary
         priceLevel: null,
         isOpen: null,
         allowsDogs: null,
+        servesVegetarianFood: null,
         ...overrides,
     };
 }
