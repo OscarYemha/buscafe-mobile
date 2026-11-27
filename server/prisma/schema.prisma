@@ -65,6 +65,10 @@ model Review {
   goodForStudy Boolean?
   goodForDate  Boolean?
 
+  // Datos para trabajar que Google Places no da: los aporta la comunidad.
+  hasWifi         Boolean?
+  hasPowerOutlets Boolean?
+
   idempotencyKey String? @unique @db.Uuid
 
   userId Int?
