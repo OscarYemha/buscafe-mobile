@@ -153,6 +153,15 @@ export default function MapScreen(
     const listRef = useRef<FlatList<CafeSummary>>(null);
     const programmaticMovementRef = useRef(false);
     const isMapGestureActiveRef = useRef(false);
+
+    /*
+     * El mapa sigue la ubicación del usuario (cada vez que el GPS se
+     * actualiza) solo mientras no lo tocó: al moverlo, hacer zoom o
+     * seleccionar un café deja de seguirlo, hasta tocar recentrar o volver a
+     * la pestaña. Antes lo seguía siempre y, con un café seleccionado, el
+     * mapa se iba solo hacia el usuario (como Google Maps, sin esto).
+     */
+    const followUserRef = useRef(true);
     const isExploringMapRef = useRef(false);
     const explorationRequestIdRef = useRef(0);
     const currentRegionRef = useRef<Region | null>(null);
@@ -347,6 +356,8 @@ export default function MapScreen(
 
     function focusCafe(cafe: CafeSummary)
     {
+        followUserRef.current = false;
+
         const currentDelta =
             currentRegionRef.current?.latitudeDelta ?? SELECTED_CAFE_DELTA;
         const delta = Math.min(currentDelta, SELECTED_CAFE_DELTA);
@@ -407,6 +418,7 @@ export default function MapScreen(
         if (
             !userLocation ||
             !mapRef.current ||
+            !followUserRef.current ||
             isMapGestureActiveRef.current ||
             isExploringMapRef.current ||
             explorationCafes !== null ||
@@ -493,6 +505,8 @@ export default function MapScreen(
 
     function returnToMyLocation(animationMs = 350)
     {
+        followUserRef.current = true;
+
         isExploringMapRef.current = false;
 
         ++explorationRequestIdRef.current;
@@ -712,6 +726,7 @@ export default function MapScreen(
                             if (details?.isGesture === true)
                             {
                                 isMapGestureActiveRef.current = true;
+                                followUserRef.current = false;
                                 cancelSearchAreaButtonTimer();
                             }
                             currentRegionRef.current = region;
