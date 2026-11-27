@@ -191,11 +191,23 @@ router.get(
         });
 
         return res.json({
+            // Todo lo que se puede editar, para precargar el formulario.
             reviews: reviews.map((review) => ({
                 id: review.id,
                 rating: review.rating,
                 comment: review.comment,
                 createdAt: review.createdAt,
+                editedAt: review.editedAt,
+                coffeeRating: review.coffeeRating,
+                foodRating: review.foodRating,
+                serviceRating: review.serviceRating,
+                comfortRating: review.comfortRating,
+                quietRating: review.quietRating,
+                goodForWork: review.goodForWork,
+                goodForStudy: review.goodForStudy,
+                goodForDate: review.goodForDate,
+                hasWifi: review.hasWifi,
+                hasPowerOutlets: review.hasPowerOutlets,
                 cafe: review.cafe,
             })),
         });
