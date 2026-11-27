@@ -175,6 +175,15 @@ export default function MapScreen(
             isMapMovingRef.current = moving;
             setIsMapMoving(moving);
         }
+
+        if (moving)
+        {
+            // Descartar la posición calculada antes del movimiento (y las que
+            // estén en camino): al detenerse, la tarjeta aparecía un instante
+            // donde estaba el pin antes de centrar y saltaba a su lugar.
+            ++projectionEpochRef.current;
+            setPopupPoint(null);
+        }
     }
 
     useEffect(() => () =>
@@ -374,7 +383,7 @@ export default function MapScreen(
             latitude: cafe.latitude,
             longitude: cafe.longitude,
         }).then(point => {
-            if (projectionEpochRef.current !== epoch)
+            if (projectionEpochRef.current !== epoch || isMapMovingRef.current)
             {
                 return;
             }
