@@ -55,6 +55,9 @@ export type CafeStats = {
 
     coffeeRatingsCount: number;
     foodRatingsCount: number;
+    serviceRatingsCount: number;
+    comfortRatingsCount: number;
+    quietRatingsCount: number;
 
     wifi: AmenityStats;
     powerOutlets: AmenityStats;
@@ -135,6 +138,9 @@ export async function getCafeStats(
 
             coffeeRatingsCount: 0,
             foodRatingsCount: 0,
+            serviceRatingsCount: 0,
+            comfortRatingsCount: 0,
+            quietRatingsCount: 0,
 
             wifi: { yesCount: 0, responsesCount: 0 },
             powerOutlets: { yesCount: 0, responsesCount: 0 },
@@ -291,6 +297,21 @@ export async function getCafeStats(
         foodRatingsCount:
             cafe.reviews.filter(
                 review => review.foodRating !== null
+            ).length,
+
+        serviceRatingsCount:
+            cafe.reviews.filter(
+                review => review.serviceRating !== null
+            ).length,
+
+        comfortRatingsCount:
+            cafe.reviews.filter(
+                review => review.comfortRating !== null
+            ).length,
+
+        quietRatingsCount:
+            cafe.reviews.filter(
+                review => review.quietRating !== null
             ).length,
 
         wifi: countAnswers(

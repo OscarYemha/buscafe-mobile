@@ -441,6 +441,13 @@ router.get('/place/:googlePlaceId', async (req, res) => {
             goodForDateCount:
                 stats.goodForDateCount,
 
+            // Cuántas personas votaron cada valoración específica.
+            coffeeRatingsCount: stats.coffeeRatingsCount,
+            foodRatingsCount: stats.foodRatingsCount,
+            serviceRatingsCount: stats.serviceRatingsCount,
+            comfortRatingsCount: stats.comfortRatingsCount,
+            quietRatingsCount: stats.quietRatingsCount,
+
             // Wi-Fi y enchufes: Google no los da, salen de las reseñas.
             wifi: stats.wifi,
             powerOutlets: stats.powerOutlets,

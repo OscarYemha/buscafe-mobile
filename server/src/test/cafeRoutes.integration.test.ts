@@ -70,6 +70,9 @@ const emptyStats = {
     goodForDateResponsesCount: 0,
     coffeeRatingsCount: 0,
     foodRatingsCount: 0,
+    serviceRatingsCount: 0,
+    comfortRatingsCount: 0,
+    quietRatingsCount: 0,
     wifi: { yesCount: 0, responsesCount: 0 },
     powerOutlets: { yesCount: 0, responsesCount: 0 },
 };
@@ -233,6 +236,28 @@ describe('GET /cafes/place/:googlePlaceId', () =>
             buscafeRating: 4,
             regularOpeningHours: ['lunes: 8–20'],
             photos: [{ url: 'https://foto/1.jpg', widthPx: 800, heightPx: 600 }],
+        });
+    });
+
+    it('devuelve cuántas personas votaron cada valoración', async () =>
+    {
+        google.getPlaceDetails.mockResolvedValue(place('ChIJdetalle'));
+        stats.getCafeStats.mockResolvedValue({
+            ...emptyStats,
+            coffeeRating: 4.2,
+            coffeeRatingsCount: 12,
+            quietRating: 3,
+            quietRatingsCount: 5,
+        });
+
+        const res = await get('/cafes/place/ChIJdetalle');
+
+        expect(res.body).toMatchObject({
+            coffeeRating: 4.2,
+            coffeeRatingsCount: 12,
+            quietRating: 3,
+            quietRatingsCount: 5,
+            foodRatingsCount: 0,
         });
     });
 

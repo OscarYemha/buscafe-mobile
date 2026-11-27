@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { formatVotes } from '../utils/votes';
 import { describeAmenity } from '../utils/amenities';
 import { formatDistance } from '../utils/distance';
 import { Ionicons } from '@expo/vector-icons';
@@ -435,27 +436,27 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                         </Text>
                         {cafe.coffeeRating !== null && (
                             <Text style={styles.communityRating}>
-                                ☕ Café: {cafe.coffeeRating.toFixed(1)} / 5
+                                ☕ Café: {cafe.coffeeRating.toFixed(1)} / 5{formatVotes(cafe.coffeeRatingsCount)}
                             </Text>
                         )}
                         {cafe.foodRating !== null && (
                             <Text style={styles.communityRating}>
-                                🍰 Comida: {cafe.foodRating.toFixed(1)} / 5
+                                🍰 Comida: {cafe.foodRating.toFixed(1)} / 5{formatVotes(cafe.foodRatingsCount)}
                             </Text>
                         )}
                         {cafe.serviceRating !== null && (
                             <Text style={styles.communityRating}>
-                                🤝 Servicio: {cafe.serviceRating.toFixed(1)} / 5
+                                🤝 Servicio: {cafe.serviceRating.toFixed(1)} / 5{formatVotes(cafe.serviceRatingsCount)}
                             </Text>
                         )}
                         {cafe.comfortRating !== null && (
                             <Text style={styles.communityRating}>
-                                🪑 Comodidad: {cafe.comfortRating.toFixed(1)} / 5
+                                🪑 Comodidad: {cafe.comfortRating.toFixed(1)} / 5{formatVotes(cafe.comfortRatingsCount)}
                             </Text>
                         )}
                         {cafe.quietRating !== null && (
                             <Text style={styles.communityRating}>
-                                🔇 Tranquilidad: {cafe.quietRating.toFixed(1)} / 5
+                                🔇 Tranquilidad: {cafe.quietRating.toFixed(1)} / 5{formatVotes(cafe.quietRatingsCount)}
                             </Text>
                         )}
                         {(
