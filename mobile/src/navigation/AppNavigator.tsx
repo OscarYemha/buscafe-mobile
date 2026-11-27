@@ -66,12 +66,12 @@ export type RootStackParamlist = {
 export type MainTabParamList = {
     Home: undefined;
     Map: undefined;
-    Account: undefined;
+    Favorites: undefined;
+    Account: NavigatorScreenParams<AccountStackParamList> | undefined;
 };
 
 export type AccountStackParamList = {
     AccountHome: undefined;
-    Favorites: undefined;
     EditProfile: undefined;
     ChangePassword: undefined;
     DeleteAccount: undefined;
@@ -103,14 +103,6 @@ function AccountNavigator()
                 component={AccountScreen}
                 options={{
                     headerShown: false,
-                }}
-            />
-
-            <AccountStack.Screen
-                name="Favorites"
-                component={FavoritesScreen}
-                options={{
-                    title: 'Cafés favoritos',
                 }}
             />
 
@@ -147,30 +139,29 @@ function MainTabs({ navigation }: MainTabsProps)
 {
     return (
         <View style={{ flex: 1 }}>
-            <AppHeader
-                onHomePress={() => {
-                    navigation.navigate(
-                        'Main',
-                        {
-                            screen: 'Home',
-                        }
-                    );
-                }}
-                onAccountPress={() => {
-                    navigation.navigate(
-                        'Main',
-                        {
-                            screen: 'Account',
-                        }
-                    );
-                }}
-                onSearchPress={() =>{
-                    navigation.navigate('Search');
-                }}
-            />
             <Tab.Navigator
                 screenOptions={({ route }) => ({
-                    headerShown: false,
+                    /*
+                     * El header vive dentro de las pestañas (no arriba de
+                     * ellas) para navegar con la navegación de pestañas: desde
+                     * afuera, "ir a Main con screen Account" solo funcionaba
+                     * si el parámetro cambiaba, o sea, a veces.
+                     */
+                    header: ({ navigation: tabNavigation }) => (
+                        <AppHeader
+                            onHomePress={() => {
+                                tabNavigation.navigate('Home');
+                            }}
+                            onAccountPress={() => {
+                                tabNavigation.navigate('Account', {
+                                    screen: 'AccountHome',
+                                });
+                            }}
+                            onSearchPress={() => {
+                                navigation.navigate('Search');
+                            }}
+                        />
+                    ),
 
                     tabBarActiveTintColor: '#6B3A22',
                     tabBarInactiveTintColor: '#9A8578',
@@ -197,6 +188,8 @@ function MainTabs({ navigation }: MainTabsProps)
                             | 'home-outline'
                             | 'map'
                             | 'map-outline'
+                            | 'heart'
+                            | 'heart-outline'
                             | 'person'
                             | 'person-outline';
 
@@ -213,6 +206,13 @@ function MainTabs({ navigation }: MainTabsProps)
                                 focused
                                     ? 'map'
                                     : 'map-outline';
+                        }
+                        else if (route.name === 'Favorites')
+                        {
+                            iconName =
+                                focused
+                                    ? 'heart'
+                                    : 'heart-outline';
                         }
                         else
                         {
@@ -245,6 +245,14 @@ function MainTabs({ navigation }: MainTabsProps)
                     component={MapScreen}
                     options={{
                         title: 'Mapa',
+                    }}
+                />
+
+                <Tab.Screen
+                    name="Favorites"
+                    component={FavoritesScreen}
+                    options={{
+                        title: 'Favoritos',
                     }}
                 />
 
