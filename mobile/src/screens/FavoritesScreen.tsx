@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../context/AuthContext';
 import { RootStackParamlist } from '../navigation/AppNavigator';
 
 type RootNavigation = NativeStackNavigationProp<RootStackParamlist>;
@@ -18,7 +19,55 @@ export default function FavoritesScreen()
     const navigation = useNavigation<RootNavigation>();
 
     const { favorites, isLoadingFavorites, removeFavorite } = useFavorites();
-    
+    const { user } = useAuth();
+
+    // Ahora es una pestaña: sin sesión, invitar a iniciarla.
+    if (!user)
+    {
+        return (
+            <SafeAreaView
+                style={styles.container}
+                edges={['left', 'right']}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Text style={styles.title}>
+                        Mis cafés favoritos
+                    </Text>
+
+                    <Text style={styles.description}>
+                        Iniciá sesión para guardar tus cafeterías favoritas y
+                        encontrarlas acá cuando quieras.
+                    </Text>
+
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={() =>
+                            navigation.navigate('Login', {
+                                returnTo: 'previous',
+                            })
+                        }
+                    >
+                        <Text style={styles.primaryButtonText}>
+                            Iniciar sesión
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.registerButton}
+                        onPress={() => navigation.navigate('Register')}
+                    >
+                        <Text style={styles.registerButtonText}>
+                            Crear cuenta
+                        </Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView
             style={styles.container}
@@ -143,6 +192,42 @@ const styles = StyleSheet.create({
         marginTop: 24,
         fontSize: 15,
         color: '#7A6254',
+    },
+
+    description: {
+        marginTop: 10,
+        fontSize: 15,
+        lineHeight: 22,
+        color: '#7A6254',
+    },
+
+    primaryButton: {
+        marginTop: 28,
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: 'center',
+        backgroundColor: '#6B3A22',
+    },
+
+    primaryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+
+    registerButton: {
+        marginTop: 12,
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#6B3A22',
+    },
+
+    registerButtonText: {
+        color: '#6B3A22',
+        fontSize: 16,
+        fontWeight: '600',
     },
 
     emptyContainer: {

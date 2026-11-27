@@ -1,4 +1,5 @@
 import {
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -101,13 +102,29 @@ export default function AccountScreen()
                     </Text>
 
                     <View style={styles.userCard}>
-                        <Text style={styles.name}>
-                            {user.name}
-                        </Text>
+                        {user.avatarUrl ? (
+                            <Image
+                                source={{ uri: user.avatarUrl }}
+                                style={styles.avatar}
+                                accessibilityLabel="Tu foto de perfil"
+                            />
+                        ) : (
+                            <View style={[styles.avatar, styles.avatarFallback]}>
+                                <Text style={styles.avatarInitial}>
+                                    {user.name.trim().charAt(0).toUpperCase()}
+                                </Text>
+                            </View>
+                        )}
 
-                        <Text style={styles.email}>
-                            {user.email}
-                        </Text>
+                        <View style={styles.userInfo}>
+                            <Text style={styles.name} numberOfLines={1}>
+                                {user.name}
+                            </Text>
+
+                            <Text style={styles.email} numberOfLines={1}>
+                                {user.email}
+                            </Text>
+                        </View>
                     </View>
 
                     <View style={styles.section}>
@@ -157,29 +174,6 @@ export default function AccountScreen()
                             </Text>
                         </TouchableOpacity>
 
-                        <View style={styles.menuDivider} />
-
-                        <TouchableOpacity
-                            style={styles.menuItem}
-                            onPress={() => {
-                                navigation.navigate('Favorites');
-                            }}
-                        >
-                            <Ionicons
-                                name="heart-outline"
-                                size={24}
-                                color="#6B3A22"
-                                style={styles.menuIcon}
-                            />
-
-                            <Text style={styles.menuText}>
-                                Cafés favoritos
-                            </Text>
-
-                            <Text style={styles.chevron}>
-                                ›
-                            </Text>
-                        </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity
@@ -243,12 +237,37 @@ const styles = StyleSheet.create({
     },
 
     userCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
         marginTop: 28,
         padding: 18,
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
         borderColor: '#E8D9C7',
         borderRadius: 14,
+    },
+
+    avatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+    },
+
+    avatarFallback: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F3E4C8',
+    },
+
+    avatarInitial: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#6B3A22',
+    },
+
+    userInfo: {
+        flex: 1,
     },
 
     name: {
