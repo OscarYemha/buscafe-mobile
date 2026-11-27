@@ -441,6 +441,10 @@ router.get('/place/:googlePlaceId', async (req, res) => {
             goodForDateCount:
                 stats.goodForDateCount,
 
+            // Wi-Fi y enchufes: Google no los da, salen de las reseñas.
+            wifi: stats.wifi,
+            powerOutlets: stats.powerOutlets,
+
             currentOpeningHours:
                 googlePlace.currentOpeningHours
                     ?.weekdayDescriptions ?? [],

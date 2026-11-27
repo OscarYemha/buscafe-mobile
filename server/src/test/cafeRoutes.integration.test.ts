@@ -70,6 +70,8 @@ const emptyStats = {
     goodForDateResponsesCount: 0,
     coffeeRatingsCount: 0,
     foodRatingsCount: 0,
+    wifi: { yesCount: 0, responsesCount: 0 },
+    powerOutlets: { yesCount: 0, responsesCount: 0 },
 };
 
 const get = (path: string) => request(app).get(path);
@@ -232,6 +234,21 @@ describe('GET /cafes/place/:googlePlaceId', () =>
             regularOpeningHours: ['lunes: 8–20'],
             photos: [{ url: 'https://foto/1.jpg', widthPx: 800, heightPx: 600 }],
         });
+    });
+
+    it('devuelve lo que dice la comunidad sobre Wi-Fi y enchufes', async () =>
+    {
+        google.getPlaceDetails.mockResolvedValue(place('ChIJdetalle'));
+        stats.getCafeStats.mockResolvedValue({
+            ...emptyStats,
+            wifi: { yesCount: 8, responsesCount: 10 },
+            powerOutlets: { yesCount: 2, responsesCount: 6 },
+        });
+
+        const res = await get('/cafes/place/ChIJdetalle');
+
+        expect(res.body.wifi).toEqual({ yesCount: 8, responsesCount: 10 });
+        expect(res.body.powerOutlets).toEqual({ yesCount: 2, responsesCount: 6 });
     });
 
     it('si falla una foto, el detalle sale igual sin esa foto', async () =>

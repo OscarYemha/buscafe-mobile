@@ -91,6 +91,14 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         ? draft.goodForDate
         : null;
 
+    const hasWifi = isCurrentCafeDraft
+        ? draft.hasWifi
+        : null;
+
+    const hasPowerOutlets = isCurrentCafeDraft
+        ? draft.hasPowerOutlets
+        : null;
+
     const canSubmit =
         isDraftReady &&
         rating > 0 &&
@@ -149,6 +157,14 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                 goodForDate: isCurrentCafeDraft
                     ? draft.goodForDate
                     : null,
+
+                hasWifi: isCurrentCafeDraft
+                    ? draft.hasWifi
+                    : null,
+
+                hasPowerOutlets: isCurrentCafeDraft
+                    ? draft.hasPowerOutlets
+                    : null,
         });
     };
 
@@ -156,7 +172,9 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         field:
             | 'goodForWork'
             | 'goodForStudy'
-            | 'goodForDate',
+            | 'goodForDate'
+            | 'hasWifi'
+            | 'hasPowerOutlets',
         value: boolean | null
     ) => {
         setDraft({
@@ -204,6 +222,14 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                 ? draft.goodForDate
                 : null,
 
+            hasWifi: isCurrentCafeDraft
+                ? draft.hasWifi
+                : null,
+
+            hasPowerOutlets: isCurrentCafeDraft
+                ? draft.hasPowerOutlets
+                : null,
+
             [field]: value,
         });
     };
@@ -213,7 +239,9 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         field:
             | 'goodForWork'
             | 'goodForStudy'
-            | 'goodForDate',
+            | 'goodForDate'
+            | 'hasWifi'
+            | 'hasPowerOutlets',
         value: boolean | null
     ) => {
         return (
@@ -389,6 +417,9 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                                 goodForWork: goodForWork ?? undefined,
                                 goodForStudy: goodForStudy ?? undefined,
                                 goodForDate: goodForDate ?? undefined,
+
+                                hasWifi: hasWifi ?? undefined,
+                                hasPowerOutlets: hasPowerOutlets ?? undefined,
                             };
 
                             const idempotencyKey = await preparePublication(
@@ -599,6 +630,14 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                                             goodForDate: isCurrentCafeDraft
                                                 ? draft.goodForDate
                                                 : null,
+
+                                            hasWifi: isCurrentCafeDraft
+                                                ? draft.hasWifi
+                                                : null,
+
+                                            hasPowerOutlets: isCurrentCafeDraft
+                                                ? draft.hasPowerOutlets
+                                                : null,
                                         })
                                     }
                                 >
@@ -675,6 +714,27 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                             goodForDate
                         )}
                     </View>
+                    <View style={styles.recommendationsSection}>
+                        <Text style={styles.label}>
+                            Para trabajar
+                        </Text>
+
+                        <Text style={styles.optionalText}>
+                            Google no tiene estos datos: los arma la comunidad.
+                        </Text>
+
+                        {renderRecommendation(
+                            '📶 ¿Tiene Wi-Fi?',
+                            'hasWifi',
+                            hasWifi
+                        )}
+
+                        {renderRecommendation(
+                            '🔌 ¿Hay enchufes disponibles?',
+                            'hasPowerOutlets',
+                            hasPowerOutlets
+                        )}
+                    </View>
                     <View
                         style={styles.commentSection}
                     >
@@ -723,6 +783,14 @@ export default function AddReviewScreen({ route, navigation }: Props) {
 
                                     goodForDate: isCurrentCafeDraft
                                         ? draft.goodForDate
+                                        : null,
+
+                                    hasWifi: isCurrentCafeDraft
+                                        ? draft.hasWifi
+                                        : null,
+
+                                    hasPowerOutlets: isCurrentCafeDraft
+                                        ? draft.hasPowerOutlets
                                         : null,
                                 })
                             }

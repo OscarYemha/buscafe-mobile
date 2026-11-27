@@ -24,6 +24,9 @@ type ReviewDraft = {
     goodForWork: boolean | null;
     goodForStudy: boolean | null;
     goodForDate: boolean | null;
+
+    hasWifi: boolean | null;
+    hasPowerOutlets: boolean | null;
 };
 
 type PublicationAttempt = {
@@ -64,6 +67,9 @@ const initialDraft: ReviewDraft = {
     goodForWork: null,
     goodForStudy: null,
     goodForDate: null,
+
+    hasWifi: null,
+    hasPowerOutlets: null,
 };
 
 const initialState: StoredDraft = {
