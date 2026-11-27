@@ -2,6 +2,7 @@ import {
     ActivityIndicator,
     FlatList,
     Linking,
+    PixelRatio,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -16,7 +17,7 @@ import {
     useState,
 } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Callout, MapMarker, Marker, Region } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
 import { useNearbyCafes } from '../context/NearbyCafesContext';
 import { getNearbyCafes } from '../services/api';
 import { CafeSummary } from '../types/CafeSummary';
@@ -53,9 +54,12 @@ const SEARCH_AREA_MIN_ZOOM_CHANGE = 0.35;
 const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 
 /*
- * La tarjeta del café seleccionado es el Callout nativo del pin: la dibuja
- * Google Maps, así que queda anclada al pin al arrastrar, hacer zoom o
- * centrar (antes era una vista flotante que se reacomodaba con retraso).
+ * La tarjeta del café seleccionado es un marcador propio, en las mismas
+ * coordenadas y apoyado sobre el pin: lo mueve Google Maps, así que queda
+ * anclada al arrastrar, hacer zoom o centrar. No se usa el Callout nativo:
+ * en Android react-native-maps guarda el tamaño de la tarjeta la primera vez
+ * que se abre y, si todavía no estaba medida, queda en 0x0 (abierta pero
+ * invisible).
  *
  * Al seleccionar un café el mapa se centra en él con el pin un poco por
  * debajo del centro, para dejar lugar a la tarjeta. Si se está lejos hace
@@ -64,7 +68,12 @@ const SEARCH_AREA_BUTTON_DELAY_MS = 700;
 const SELECTED_CAFE_DELTA = 0.01;
 const SELECTED_PIN_OFFSET = 0.15; // fracción de la altura bajo el centro
 const SELECT_ANIMATION_MS = 400;
-const CALLOUT_OPEN_DELAY_MS = 120;
+// La imagen del pin seleccionado mide 67 px: la tarjeta se apoya encima.
+const SELECTED_PIN_HEIGHT_DP = 67 / PixelRatio.get();
+
+// Capas: pines < ubicación del usuario < tarjeta.
+const USER_DOT_Z_INDEX = 2000;
+const CARD_Z_INDEX = 3000;
 const REFOCUS_RECENTER_DELAY_MS = 250;
 
 const RECENTER_BUTTON_SIZE = 46;
@@ -147,30 +156,6 @@ export default function MapScreen(
     const searchReferenceRegionRef = useRef<Region | null>(null);
     const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
 
-    // Para abrir la tarjeta (Callout) del pin seleccionado desde el código.
-    const markerRefs = useRef<Record<string, MapMarker | null>>({});
-    const selectedCafeIdRef = useRef<string | null>(null);
-    selectedCafeIdRef.current = selectedCafeId;
-
-    function showSelectedCallout(cafeId: string | null)
-    {
-        if (!cafeId)
-        {
-            return;
-        }
-
-        // Solo para selecciones que no vienen de tocar el pin (lista, volver
-        // del detalle): al tocar el pin, Google abre la tarjeta solo. Un único
-        // pedido: cada showCallout redibuja la tarjeta y repetirlo parpadeaba.
-        setTimeout(() =>
-        {
-            if (selectedCafeIdRef.current === cafeId)
-            {
-                markerRefs.current[cafeId]?.showCallout();
-            }
-        }, CALLOUT_OPEN_DELAY_MS);
-    }
-
     function focusCafe(cafe: CafeSummary)
     {
         const currentDelta =
@@ -216,7 +201,6 @@ export default function MapScreen(
                 // Volviendo del detalle: mismo café seleccionado y su tarjeta.
                 returningFromDetailRef.current = null;
                 setSelectedCafeId(restoredCafeId);
-                showSelectedCallout(restoredCafeId);
             }
             else
             {
@@ -472,7 +456,7 @@ export default function MapScreen(
         const status = getOpenStatus(cafe.isOpen);
 
         return (
-            <View style={styles.calloutContainer}>
+            <View style={styles.cardMarker}>
                 <View style={styles.popupCard}>
                     <View style={styles.popupTitleRow}>
                         <Text style={styles.popupTitle} numberOfLines={2}>
@@ -707,8 +691,9 @@ export default function MapScreen(
                         }}
                     >
 
-                    {/* Ubicación del usuario como pin propio: el puntito nativo de
-                        Google se dibuja por encima de las tarjetas. */}
+                    {/* Ubicación del usuario como pin propio (el puntito nativo de
+                        Google se dibuja por encima de todo): queda arriba de los
+                        pines pero debajo de la tarjeta. */}
                     {userLocation && (
                         <Marker
                             coordinate={{
@@ -717,7 +702,7 @@ export default function MapScreen(
                             }}
                             anchor={{ x: 0.5, y: 0.5 }}
                             tappable={false}
-                            zIndex={0}
+                            zIndex={USER_DOT_Z_INDEX}
                         >
                             <View style={styles.userDot}>
                                 <View style={styles.userDotInner} />
@@ -727,9 +712,6 @@ export default function MapScreen(
 
                     {sortedCafes.map((cafe) => (
                         <Marker
-                            // Key estable: recrear el pin al seleccionarlo hacía
-                            // parpadear la tarjeta. Cada pin tiene su tarjeta lista
-                            // (abajo), así Google la abre en el acto al tocarlo.
                             key={cafe.googlePlaceId}
                             image={
                                 selectedCafeId === cafe.googlePlaceId
@@ -745,11 +727,6 @@ export default function MapScreen(
                                     ? 1000
                                     : 1
                             }
-                            ref={(marker) =>
-                            {
-                                markerRefs.current[cafe.googlePlaceId] = marker;
-                            }}
-                            onCalloutPress={() => openCafeDetail(cafe.googlePlaceId)}
                             onPress={() =>
                             {
                                 const cafeId = cafe.googlePlaceId;
@@ -776,12 +753,23 @@ export default function MapScreen(
                                     });
                                 });
                             }}
-                        >
-                            <Callout tooltip>
-                                {renderCafeCard(cafe)}
-                            </Callout>
-                        </Marker>
+                        />
                     ))}
+
+                    {selectedCafe && (
+                        <Marker
+                            key={`card-${selectedCafe.googlePlaceId}`}
+                            coordinate={{
+                                latitude: selectedCafe.latitude,
+                                longitude: selectedCafe.longitude,
+                            }}
+                            anchor={{ x: 0.5, y: 1 }}
+                            zIndex={CARD_Z_INDEX}
+                            onPress={() => openCafeDetail(selectedCafe.googlePlaceId)}
+                        >
+                            {renderCafeCard(selectedCafe)}
+                        </Marker>
+                    )}
 
                     </MapView>
 
@@ -928,7 +916,6 @@ export default function MapScreen(
                                             cafe.googlePlaceId
                                         );
                                         focusCafe(cafe);
-                                        showSelectedCallout(cafe.googlePlaceId);
                                     }}
                                 >
                                     <View style={styles.cafeMainInfo}>
@@ -1040,10 +1027,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#4285F4',
     },
 
-    calloutContainer: {
+    cardMarker: {
         width: CARD_WIDTH,
         alignItems: 'center',
-        paddingBottom: 4,
+        paddingBottom: SELECTED_PIN_HEIGHT_DP,
     },
     popupCard: {
         width: CARD_WIDTH,
