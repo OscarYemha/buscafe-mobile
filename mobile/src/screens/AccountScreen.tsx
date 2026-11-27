@@ -344,8 +344,9 @@ const styles = StyleSheet.create({
         gap: 14,
         marginTop: 28,
         paddingHorizontal: 18,
-        // 4 menos que antes arriba y abajo: compensa la foto de 66 (era 56).
-        paddingVertical: 14,
+        // Compensa la foto (66, era 56) y los textos más grandes: la tarjeta
+        // mantiene su alto original.
+        paddingVertical: 13,
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
         borderColor: '#E8D9C7',
