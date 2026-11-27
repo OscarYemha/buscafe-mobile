@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { describeAmenity } from '../utils/amenities';
 import { formatDistance } from '../utils/distance';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -238,6 +239,9 @@ export default function CafeDetailScreen({ route, navigation }: Props)
             console.error('Error al actualizar favorito', error);
         }
     };
+
+    const wifiLabel = describeAmenity(cafe.wifi);
+    const powerOutletsLabel = describeAmenity(cafe.powerOutlets);
 
     return (
         <SafeAreaView
@@ -487,6 +491,24 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                                         )}
                                 </View>
                             </View>
+                        )}
+                    </View>
+                )}
+
+                {(wifiLabel || powerOutletsLabel) && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>
+                            Para trabajar
+                        </Text>
+                        {wifiLabel && (
+                            <Text style={styles.communityRating}>
+                                📶 Wi-Fi: {wifiLabel}
+                            </Text>
+                        )}
+                        {powerOutletsLabel && (
+                            <Text style={styles.communityRating}>
+                                🔌 Enchufes: {powerOutletsLabel}
+                            </Text>
                         )}
                     </View>
                 )}

@@ -187,6 +187,9 @@ export type CreateReviewData = {
     goodForStudy?: boolean;
     goodForDate?: boolean;
 
+    hasWifi?: boolean;
+    hasPowerOutlets?: boolean;
+
     idempotencyKey: string;
 };
 

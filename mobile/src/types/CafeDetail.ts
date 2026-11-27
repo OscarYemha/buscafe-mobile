@@ -1,3 +1,5 @@
+import { AmenityStats } from '../utils/amenities';
+
 
 import { CafeSummary } from './CafeSummary';
 
@@ -39,6 +41,10 @@ export type CafeDetail = CafeSummary & {
     goodForWorkCount: number;
     goodForStudyCount: number;
     goodForDateCount: number;
+
+    // Opcionales: un server sin este cambio no los manda.
+    wifi?: AmenityStats;
+    powerOutlets?: AmenityStats;
 
     currentOpeningHours: string[];
     regularOpeningHours: string[];
