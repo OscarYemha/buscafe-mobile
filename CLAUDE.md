@@ -79,3 +79,8 @@ si llega el aviso, reactivarlo en Actions.
   cafetería, cerró) y sugerir agregar una que Google no muestra. Oscar
   revisa cada sugerencia antes de que tenga efecto. Diseñar antes.
 - Política de privacidad publicada (la app usa ubicación, email y fotos).
+- Defensas contra bots en reseñas (hoy: email verificado para tener
+  sesión y límites por usuario). Al publicar en el Play Store: Play
+  Integrity (necesita APK nuevo; conviene junto con el SDK 58). Antes, si
+  hace falta: marcar para revisión de Oscar las reseñas sospechosas
+  (cuenta recién creada, muchas desde la misma IP, textos repetidos).
