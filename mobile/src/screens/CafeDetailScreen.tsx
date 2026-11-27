@@ -593,6 +593,7 @@ export default function CafeDetailScreen({ route, navigation }: Props)
                                     {new Date(
                                         review.createdAt
                                     ).toLocaleDateString('es-AR')}
+                                    {review.editedAt ? ' · editada' : ''}
                                 </Text>
                             </View>
                         ))

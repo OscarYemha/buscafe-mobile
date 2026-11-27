@@ -8,6 +8,7 @@ export type CafeReview = {
     rating: number;
     comment: string;
     createdAt: string;
+    editedAt: string | null;
 
     coffeeRating: number | null;
     foodRating: number | null;

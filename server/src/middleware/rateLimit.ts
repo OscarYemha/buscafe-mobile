@@ -175,6 +175,14 @@ export const createResourceRateLimiters = () => ({
             30,
             'Llegaste al límite de reseñas por hora. Probá de nuevo más tarde.'
         ),
+    // Aparte de reviewsByUser: editar o borrar no gasta el cupo de publicar.
+    reviewChangesByUser:
+        byUser(
+            'review-changes-user',
+            HOUR,
+            60,
+            'Hiciste muchos cambios en tus reseñas. Probá de nuevo más tarde.'
+        ),
     favoritesByUser:
         byUser(
             'favorites-user',

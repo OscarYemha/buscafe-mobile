@@ -86,7 +86,7 @@ describe('GET /users/me/reviews', () =>
         });
     });
 
-    it('no expone datos internos de la reseña', async () =>
+    it('devuelve lo editable y no los datos internos (userId, idempotencyKey)', async () =>
     {
         const me = await createUser();
         const cafe = seedCafe('ChIJx', 'Café X');
@@ -94,7 +94,24 @@ describe('GET /users/me/reviews', () =>
 
         const res = await getMyReviews(me.token);
 
-        expect(Object.keys(res.body.reviews[0]).sort()).toEqual(['cafe', 'comment', 'createdAt', 'id', 'rating']);
+        expect(Object.keys(res.body.reviews[0]).sort()).toEqual([
+            'cafe',
+            'coffeeRating',
+            'comfortRating',
+            'comment',
+            'createdAt',
+            'editedAt',
+            'foodRating',
+            'goodForDate',
+            'goodForStudy',
+            'goodForWork',
+            'hasPowerOutlets',
+            'hasWifi',
+            'id',
+            'quietRating',
+            'rating',
+            'serviceRating',
+        ]);
     });
 
     it('sin reseñas devuelve una lista vacía', async () =>

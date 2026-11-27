@@ -55,6 +55,11 @@ model Review {
   comment   String
   createdAt DateTime @default(now())
 
+  // Última edición visible: null si nunca se editó o si solo se editó
+  // dentro del período de gracia (ver reviews.routes.ts). No es @updatedAt
+  // a propósito, para que esa regla quede en el código.
+  editedAt DateTime?
+
   coffeeRating  Int?
   foodRating    Int?
   serviceRating Int?

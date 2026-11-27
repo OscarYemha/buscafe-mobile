@@ -179,6 +179,7 @@ export const db = {
     })),
     cafes: new Table(['googlePlaceId'], () => ({})),
     reviews: new Table(['idempotencyKey'], () => ({
+        editedAt: null,
         coffeeRating: null,
         foodRating: null,
         serviceRating: null,
@@ -277,6 +278,20 @@ export const fakePrisma = {
             return row ? withCafe(row, include) : null;
         },
         create: async ({ data = {} }: Args) => ({ ...db.reviews.insert(data) }),
+        update: async ({ where = {}, data = {} }: Args) =>
+        {
+            const row = db.reviews.find(where);
+            if (!row) throw notFoundError();
+            db.reviews.patch(row, data);
+            return { ...row };
+        },
+        delete: async ({ where = {} }: Args) =>
+        {
+            const row = db.reviews.find(where);
+            if (!row) throw notFoundError();
+            db.reviews.rows = db.reviews.rows.filter((r) => r !== row);
+            return row;
+        },
         // Solo orderBy por createdAt (lo que usa GET /users/me/reviews).
         findMany: async ({ where = {}, include, orderBy }: Args & { orderBy?: { createdAt?: 'asc' | 'desc' } }) =>
         {

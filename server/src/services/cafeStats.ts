@@ -5,6 +5,7 @@ export type CafeReview = {
     rating: number;
     comment: string;
     createdAt: Date;
+    editedAt: Date | null;
 
     coffeeRating: number | null;
     foodRating: number | null;
@@ -87,6 +88,7 @@ export async function getCafeStats(
                     rating: true,
                     comment: true,
                     createdAt: true,
+                    editedAt: true,
 
                     coffeeRating: true,
                     foodRating: true,

@@ -228,6 +228,64 @@ export async function createReview(
     return response.json();
 }
 
+/*
+ * Edición: reemplaza todo el contenido. Lo que falte (undefined) queda
+ * vacío en el server, igual que en el alta.
+ */
+export type UpdateReviewData = Omit<
+    CreateReviewData,
+    'googlePlaceId' | 'cafeName' | 'cafeAddress' | 'cafeLatitude' | 'cafeLongitude' | 'idempotencyKey'
+>;
+
+async function sendReviewChange(
+    reviewId: number,
+    method: 'PATCH' | 'DELETE',
+    fallbackMessage: string,
+    data?: UpdateReviewData
+): Promise<Response>
+{
+    const token = await SecureStore.getItemAsync('auth_token');
+
+    if (!token)
+    {
+        throw new Error('Tenés que iniciar sesión para cambiar tus reseñas');
+    }
+
+    const response = await fetch(
+        `${API_URL}/reviews/${reviewId}`,
+        {
+            method,
+            headers: {
+                ...(data ? { 'Content-Type': 'application/json' } : {}),
+                Authorization: `Bearer ${token}`,
+            },
+            body: data ? JSON.stringify(data) : undefined,
+        }
+    );
+
+    await throwIfUnauthorized(response.status, token);
+
+    if (!response.ok)
+    {
+        throw await apiErrorFromResponse(response, fallbackMessage);
+    }
+
+    return response;
+}
+
+export async function updateReview(
+    reviewId: number,
+    data: UpdateReviewData
+): Promise<void>
+{
+    await sendReviewChange(reviewId, 'PATCH', 'No se pudo guardar la reseña', data);
+}
+
+export async function deleteReview(reviewId: number): Promise<void>
+{
+    await sendReviewChange(reviewId, 'DELETE', 'No se pudo borrar la reseña');
+}
+
 export type AuthUser = {
     id: number;
     name: string;
@@ -797,6 +855,21 @@ export type MyReview = {
     rating: number;
     comment: string;
     createdAt: string;
+    editedAt: string | null;
+
+    coffeeRating: number | null;
+    foodRating: number | null;
+    serviceRating: number | null;
+    comfortRating: number | null;
+    quietRating: number | null;
+
+    goodForWork: boolean | null;
+    goodForStudy: boolean | null;
+    goodForDate: boolean | null;
+
+    hasWifi: boolean | null;
+    hasPowerOutlets: boolean | null;
+
     cafe: {
         googlePlaceId: string;
         name: string;

@@ -15,7 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamlist } from '../navigation/AppNavigator';
 import { useReviewDraft } from '../context/ReviewDraftContext';
 import { useAuth } from '../context/AuthContext';
-import { createReview, isInvalidSessionError } from '../services/api';
+import { createReview, isInvalidSessionError, updateReview } from '../services/api';
 import { useReviews } from '../context/ReviewsContext';
 import { getErrorMessage } from '../utils/errorMessages';
 import { formatWaitTime, isApiError } from '../services/apiError';
@@ -23,18 +23,84 @@ import { useState } from 'react';
 
 type Props = NativeStackScreenProps<
     RootStackParamlist,
-    'AddReview'
+    'AddReview' | 'EditReview'
 >;
+
+/** El contenido del formulario: lo mismo para una reseña nueva y una editada. */
+type ReviewValues = {
+    rating: number;
+    comment: string;
+
+    coffeeRating: number | null;
+    foodRating: number | null;
+    serviceRating: number | null;
+    comfortRating: number | null;
+    quietRating: number | null;
+
+    goodForWork: boolean | null;
+    goodForStudy: boolean | null;
+    goodForDate: boolean | null;
+
+    hasWifi: boolean | null;
+    hasPowerOutlets: boolean | null;
+};
+
+const EMPTY_VALUES: ReviewValues = {
+    rating: 0,
+    comment: '',
+
+    coffeeRating: null,
+    foodRating: null,
+    serviceRating: null,
+    comfortRating: null,
+    quietRating: null,
+
+    goodForWork: null,
+    goodForStudy: null,
+    goodForDate: null,
+
+    hasWifi: null,
+    hasPowerOutlets: null,
+};
+
+const pickValues = (source: ReviewValues): ReviewValues => ({
+    rating: source.rating,
+    comment: source.comment,
+
+    coffeeRating: source.coffeeRating,
+    foodRating: source.foodRating,
+    serviceRating: source.serviceRating,
+    comfortRating: source.comfortRating,
+    quietRating: source.quietRating,
+
+    goodForWork: source.goodForWork,
+    goodForStudy: source.goodForStudy,
+    goodForDate: source.goodForDate,
+
+    hasWifi: source.hasWifi,
+    hasPowerOutlets: source.hasPowerOutlets,
+});
 
 export default function AddReviewScreen({ route, navigation }: Props) {
 
-    const {
-        googlePlaceId,
-        cafeName,
-        cafeAddress,
-        cafeLatitude,
-        cafeLongitude,
-    } = route.params;
+    /*
+     * Dos modos con el mismo formulario:
+     * - Nueva (AddReview): los valores viven en el borrador, que se guarda
+     *   en el teléfono y sobrevive a cerrar la app.
+     * - Edición (EditReview): estado local precargado con la reseña. No toca
+     *   el borrador, para no pisar una reseña nueva a medio escribir.
+     */
+    const editingReview =
+        'review' in route.params ? route.params.review : null;
+    const isEditing = editingReview !== null;
+
+    const newReviewParams =
+        'review' in route.params ? null : route.params;
+
+    const googlePlaceId =
+        editingReview?.cafe.googlePlaceId ?? newReviewParams!.googlePlaceId;
+    const cafeName =
+        editingReview?.cafe.name ?? newReviewParams!.cafeName;
 
     const {
         draft,
@@ -49,60 +115,54 @@ export default function AddReviewScreen({ route, navigation }: Props) {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const [editValues, setEditValues] = useState<ReviewValues>(() =>
+        editingReview ? pickValues(editingReview) : EMPTY_VALUES
+    );
+
     const isCurrentCafeDraft = draft.cafeId === googlePlaceId;
 
-    const rating = isCurrentCafeDraft
-        ? draft.rating
-        : 0;
+    const draftValues = isCurrentCafeDraft
+        ? pickValues(draft)
+        : EMPTY_VALUES;
 
-    const comment = isCurrentCafeDraft
-        ? draft.comment
-        : '';
+    const values = isEditing ? editValues : draftValues;
 
-    const coffeeRating = isCurrentCafeDraft
-        ? draft.coffeeRating
-        : null;
-
-    const foodRating = isCurrentCafeDraft
-        ? draft.foodRating
-        : null;
-
-    const serviceRating = isCurrentCafeDraft
-        ? draft.serviceRating
-        : null;
-
-    const comfortRating = isCurrentCafeDraft
-        ? draft.comfortRating
-        : null;
-
-    const quietRating = isCurrentCafeDraft
-        ? draft.quietRating
-        : null;
-
-    const goodForWork = isCurrentCafeDraft
-        ? draft.goodForWork
-        : null;
-
-    const goodForStudy = isCurrentCafeDraft
-        ? draft.goodForStudy
-        : null;
-
-    const goodForDate = isCurrentCafeDraft
-        ? draft.goodForDate
-        : null;
-
-    const hasWifi = isCurrentCafeDraft
-        ? draft.hasWifi
-        : null;
-
-    const hasPowerOutlets = isCurrentCafeDraft
-        ? draft.hasPowerOutlets
-        : null;
+    const {
+        rating,
+        comment,
+        coffeeRating,
+        foodRating,
+        serviceRating,
+        comfortRating,
+        quietRating,
+        goodForWork,
+        goodForStudy,
+        goodForDate,
+        hasWifi,
+        hasPowerOutlets,
+    } = values;
 
     const canSubmit =
-        isDraftReady &&
+        (isEditing || isDraftReady) &&
         rating > 0 &&
         comment.trim().length > 0;
+
+    const updateField = <K extends keyof ReviewValues>(
+        field: K,
+        value: ReviewValues[K]
+    ) => {
+        if (isEditing)
+        {
+            setEditValues((previous) => ({ ...previous, [field]: value }));
+            return;
+        }
+
+        setDraft({
+            cafeId: googlePlaceId,
+            ...draftValues,
+            [field]: value,
+        });
+    };
 
     const updateSpecificRating = (
         field:
@@ -112,61 +172,7 @@ export default function AddReviewScreen({ route, navigation }: Props) {
             | 'comfortRating'
             | 'quietRating',
         value: number | null
-        ) => {
-            setDraft({
-                cafeId: googlePlaceId,
-
-                rating: isCurrentCafeDraft
-                    ? draft.rating
-                    : 0,
-
-                comment: isCurrentCafeDraft
-                    ? draft.comment
-                    : '',
-
-                coffeeRating: isCurrentCafeDraft
-                    ? draft.coffeeRating
-                    : null,
-
-                foodRating: isCurrentCafeDraft
-                    ? draft.foodRating
-                    : null,
-
-                serviceRating: isCurrentCafeDraft
-                    ? draft.serviceRating
-                    : null,
-
-                comfortRating: isCurrentCafeDraft
-                    ? draft.comfortRating
-                    : null,
-
-                quietRating: isCurrentCafeDraft
-                    ? draft.quietRating
-                    : null,
-
-                [field]: value,
-
-                goodForWork: isCurrentCafeDraft
-                    ? draft.goodForWork
-                    : null,
-
-                goodForStudy: isCurrentCafeDraft
-                    ? draft.goodForStudy
-                    : null,
-
-                goodForDate: isCurrentCafeDraft
-                    ? draft.goodForDate
-                    : null,
-
-                hasWifi: isCurrentCafeDraft
-                    ? draft.hasWifi
-                    : null,
-
-                hasPowerOutlets: isCurrentCafeDraft
-                    ? draft.hasPowerOutlets
-                    : null,
-        });
-    };
+    ) => updateField(field, value);
 
     const updateRecommendation = (
         field:
@@ -176,63 +182,7 @@ export default function AddReviewScreen({ route, navigation }: Props) {
             | 'hasWifi'
             | 'hasPowerOutlets',
         value: boolean | null
-    ) => {
-        setDraft({
-            ...draft,
-
-            cafeId: googlePlaceId,
-
-            rating: isCurrentCafeDraft
-                ? draft.rating
-                : 0,
-
-            comment: isCurrentCafeDraft
-                ? draft.comment
-                : '',
-
-            coffeeRating: isCurrentCafeDraft
-                ? draft.coffeeRating
-                : null,
-
-            foodRating: isCurrentCafeDraft
-                ? draft.foodRating
-                : null,
-
-            serviceRating: isCurrentCafeDraft
-                ? draft.serviceRating
-                : null,
-
-            comfortRating: isCurrentCafeDraft
-                ? draft.comfortRating
-                : null,
-
-            quietRating: isCurrentCafeDraft
-                ? draft.quietRating
-                : null,
-
-            goodForWork: isCurrentCafeDraft
-                ? draft.goodForWork
-                : null,
-
-            goodForStudy: isCurrentCafeDraft
-                ? draft.goodForStudy
-                : null,
-
-            goodForDate: isCurrentCafeDraft
-                ? draft.goodForDate
-                : null,
-
-            hasWifi: isCurrentCafeDraft
-                ? draft.hasWifi
-                : null,
-
-            hasPowerOutlets: isCurrentCafeDraft
-                ? draft.hasPowerOutlets
-                : null,
-
-            [field]: value,
-        });
-    };
+    ) => updateField(field, value);
 
     const renderRecommendation = (
         label: string,
@@ -361,7 +311,112 @@ export default function AddReviewScreen({ route, navigation }: Props) {
         );
     };
 
-        const handleSubmit = () =>
+    // Mismo envío de contenido para el alta y la edición.
+    const reviewContent = {
+        rating,
+        comment: comment.trim(),
+
+        coffeeRating: coffeeRating ?? undefined,
+        foodRating: foodRating ?? undefined,
+        serviceRating: serviceRating ?? undefined,
+        comfortRating: comfortRating ?? undefined,
+        quietRating: quietRating ?? undefined,
+
+        goodForWork: goodForWork ?? undefined,
+        goodForStudy: goodForStudy ?? undefined,
+        goodForDate: goodForDate ?? undefined,
+
+        hasWifi: hasWifi ?? undefined,
+        hasPowerOutlets: hasPowerOutlets ?? undefined,
+    };
+
+    const handleSessionExpired = async (message: string, extra: string) =>
+    {
+        try
+        {
+            await logout();
+        }
+        catch (logoutError)
+        {
+            console.error('Error al cerrar la sesión vencida:', logoutError);
+        }
+
+        Alert.alert(
+            'Sesión vencida',
+            `${message}${extra}`,
+            [
+                {
+                    text: 'Iniciar sesión',
+                    onPress: () =>
+                    {
+                        navigation.navigate('Login', {
+                            returnTo: 'previous',
+                        });
+                    },
+                },
+            ]
+        );
+    };
+
+    const saveEdit = async (reviewId: number) =>
+    {
+        setIsSubmitting(true);
+
+        try
+        {
+            await updateReview(reviewId, reviewContent);
+
+            notifyReviewsChanged();
+            navigation.goBack();
+        }
+        catch (error)
+        {
+            console.error('Error al guardar la reseña:', error);
+
+            if (isInvalidSessionError(error))
+            {
+                await handleSessionExpired(error.message, '');
+                return;
+            }
+
+            if (isApiError(error) && error.status === 404)
+            {
+                Alert.alert(
+                    'Reseña no disponible',
+                    'Esta reseña ya no existe: quizás la borraste desde otro dispositivo.',
+                    [{ text: 'Aceptar', onPress: () => navigation.goBack() }]
+                );
+                return;
+            }
+
+            if (
+                isApiError(error) &&
+                error.status === 429 &&
+                error.retryAfterSeconds !== null
+            )
+            {
+                Alert.alert(
+                    'Límite de cambios alcanzado',
+                    `Hiciste muchos cambios en poco tiempo. Podés volver a intentar en ${formatWaitTime(error.retryAfterSeconds)}.`
+                );
+                return;
+            }
+
+            Alert.alert(
+                'No se pudo guardar la reseña',
+                getErrorMessage(
+                    error,
+                    'No pudimos guardar los cambios. Intentá nuevamente.'
+                )
+            );
+        }
+        finally
+        {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSubmit = () =>
     {
         if (!canSubmit || isSubmitting)
         {
@@ -376,6 +431,29 @@ export default function AddReviewScreen({ route, navigation }: Props) {
 
             return;
         }
+
+        if (editingReview)
+        {
+            Alert.alert(
+                '¿Guardar cambios?',
+                `¿Querés guardar los cambios en tu reseña de ${cafeName}?`,
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                        text: 'Guardar',
+                        onPress: () => void saveEdit(editingReview.id),
+                    },
+                ]
+            );
+
+            return;
+        }
+
+        const {
+            cafeAddress,
+            cafeLatitude,
+            cafeLongitude,
+        } = newReviewParams!;
 
         Alert.alert(
             '¿Publicar reseña?',
@@ -405,21 +483,7 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                                 cafeLatitude,
                                 cafeLongitude,
 
-                                rating,
-                                comment: comment.trim(),
-
-                                coffeeRating: coffeeRating ?? undefined,
-                                foodRating: foodRating ?? undefined,
-                                serviceRating: serviceRating ?? undefined,
-                                comfortRating: comfortRating ?? undefined,
-                                quietRating: quietRating ?? undefined,
-
-                                goodForWork: goodForWork ?? undefined,
-                                goodForStudy: goodForStudy ?? undefined,
-                                goodForDate: goodForDate ?? undefined,
-
-                                hasWifi: hasWifi ?? undefined,
-                                hasPowerOutlets: hasPowerOutlets ?? undefined,
+                                ...reviewContent,
                             };
 
                             const idempotencyKey = await preparePublication(
@@ -460,32 +524,9 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                             // sesión. El borrador queda guardado para después.
                             if (isInvalidSessionError(error))
                             {
-                                try
-                                {
-                                    await logout();
-                                }
-                                catch (logoutError)
-                                {
-                                    console.error(
-                                        'Error al cerrar la sesión vencida:',
-                                        logoutError
-                                    );
-                                }
-
-                                Alert.alert(
-                                    'Sesión vencida',
-                                    `${error.message} Tu borrador queda guardado.`,
-                                    [
-                                        {
-                                            text: 'Iniciar sesión',
-                                            onPress: () =>
-                                            {
-                                                navigation.navigate('Login', {
-                                                    returnTo: 'previous',
-                                                });
-                                            },
-                                        },
-                                    ]
+                                await handleSessionExpired(
+                                    error.message,
+                                    ' Tu borrador queda guardado.'
                                 );
 
                                 return;
@@ -576,11 +617,13 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                     keyboardShouldPersistTaps="handled"
                 >
                     <Text style={styles.title}>
-                        Reseñar {cafeName}
+                        {isEditing ? `Editar reseña de ${cafeName}` : `Reseñar ${cafeName}`}
                     </Text>
 
                     <Text style={styles.description}>
-                        Contanos cómo fue tu experiencia.
+                        {isEditing
+                            ? 'Actualizá lo que cambió desde tu visita.'
+                            : 'Contanos cómo fue tu experiencia.'}
                     </Text>
                     <View style={styles.ratingSection}>
                         <Text style={styles.label}>
@@ -591,55 +634,7 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                             {[1, 2, 3, 4, 5].map((star) => (
                                 <TouchableOpacity
                                     key={star}
-                                    onPress={() => 
-                                        setDraft({
-                                            cafeId: googlePlaceId,
-                                            rating: star,
-                                            comment: isCurrentCafeDraft
-                                                ? draft.comment
-                                                : '',
-
-                                            coffeeRating: isCurrentCafeDraft
-                                                ? draft.coffeeRating
-                                                : null,
-
-                                            foodRating: isCurrentCafeDraft
-                                                ? draft.foodRating
-                                                : null,
-
-                                            serviceRating: isCurrentCafeDraft
-                                                ? draft.serviceRating
-                                                : null,
-
-                                            comfortRating: isCurrentCafeDraft
-                                                ? draft.comfortRating
-                                                : null,
-
-                                            quietRating: isCurrentCafeDraft
-                                                ? draft.quietRating
-                                                : null,
-
-                                            goodForWork: isCurrentCafeDraft
-                                                ? draft.goodForWork
-                                                : null,
-
-                                            goodForStudy: isCurrentCafeDraft
-                                                ? draft.goodForStudy
-                                                : null,
-
-                                            goodForDate: isCurrentCafeDraft
-                                                ? draft.goodForDate
-                                                : null,
-
-                                            hasWifi: isCurrentCafeDraft
-                                                ? draft.hasWifi
-                                                : null,
-
-                                            hasPowerOutlets: isCurrentCafeDraft
-                                                ? draft.hasPowerOutlets
-                                                : null,
-                                        })
-                                    }
+                                    onPress={() => updateField('rating', star)}
                                 >
                                     <Text style={styles.star}>
                                         {star <= rating ? '★' : '☆'}
@@ -745,55 +740,7 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                         <TextInput
                             style={styles.commentInput}
                             value={comment}
-                            onChangeText={(text) =>
-                                setDraft({
-                                    cafeId: googlePlaceId,
-                                    rating: isCurrentCafeDraft
-                                        ? draft.rating
-                                        : 0,
-                                    comment: text,
-
-                                    coffeeRating: isCurrentCafeDraft
-                                        ? draft.coffeeRating
-                                        : null,
-
-                                    foodRating: isCurrentCafeDraft
-                                        ? draft.foodRating
-                                        : null,
-
-                                    serviceRating: isCurrentCafeDraft
-                                        ? draft.serviceRating
-                                        : null,
-
-                                    comfortRating: isCurrentCafeDraft
-                                        ? draft.comfortRating
-                                        : null,
-
-                                    quietRating: isCurrentCafeDraft
-                                        ? draft.quietRating
-                                        : null,
-
-                                    goodForWork: isCurrentCafeDraft
-                                        ? draft.goodForWork
-                                        : null,
-
-                                    goodForStudy: isCurrentCafeDraft
-                                        ? draft.goodForStudy
-                                        : null,
-
-                                    goodForDate: isCurrentCafeDraft
-                                        ? draft.goodForDate
-                                        : null,
-
-                                    hasWifi: isCurrentCafeDraft
-                                        ? draft.hasWifi
-                                        : null,
-
-                                    hasPowerOutlets: isCurrentCafeDraft
-                                        ? draft.hasPowerOutlets
-                                        : null,
-                                })
-                            }
+                            onChangeText={(text) => updateField('comment', text)}
                             placeholder="Contanos qué te gustó o qué podría mejorar..."
                             placeholderTextColor="#9A8578"
                             multiline
@@ -822,12 +769,12 @@ export default function AddReviewScreen({ route, navigation }: Props) {
                                     />
 
                                     <Text style={styles.submitButtonText}>
-                                        Publicando...
+                                        {isEditing ? 'Guardando...' : 'Publicando...'}
                                     </Text>
                                 </View>
                             ) : (
                                 <Text style={styles.submitButtonText}>
-                                    Publicar reseña
+                                    {isEditing ? 'Guardar cambios' : 'Publicar reseña'}
                                 </Text>
                             )}
                         </TouchableOpacity>
