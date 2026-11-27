@@ -69,3 +69,13 @@ si llega el aviso, reactivarlo en Actions.
   Resend (hoy los mails salen de onboarding@resend.dev y solo le llegan
   al dueño de la cuenta), alertas de presupuesto en Google Cloud y ver si
   el plan de Render duerme el server.
+- Nombre de la app: "BUSCAFES" está registrada en el INPI (clase 35,
+  concedida hasta 2035, de un particular) y buscafes.com.ar está tomado:
+  conviene cambiar el nombre antes de comprar dominio y publicar.
+  Candidatos con .com.ar y .app libres (nov 2026): Pocillo, Cafenauta,
+  Cafezona. Falta que Oscar los busque en el INPI (clases 9, 42 y 43).
+  Competencia directa: Cafeteamo, Cafeteando, Buen Café.
+- Sugerencias de usuarios: reportar una cafetería (no existe, no es
+  cafetería, cerró) y sugerir agregar una que Google no muestra. Oscar
+  revisa cada sugerencia antes de que tenga efecto. Diseñar antes.
+- Política de privacidad publicada (la app usa ubicación, email y fotos).
