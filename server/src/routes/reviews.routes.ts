@@ -31,6 +31,24 @@ function isOptionalBoolean(value: unknown): boolean
         typeof value === 'boolean';
 }
 
+/** Lo que se puede escribir en una reseña: vale igual al crearla y al editarla. */
+function hasValidReviewContent(body: Record<string, unknown>): boolean
+{
+    const { rating, comment } = body;
+
+    return (
+        Number.isInteger(rating) &&
+        (rating as number) >= 1 &&
+        (rating as number) <= 5 &&
+        typeof comment === 'string' &&
+        comment.trim() !== '' &&
+        ['coffeeRating', 'foodRating', 'serviceRating', 'comfortRating', 'quietRating']
+            .every((field) => isOptionalRating(body[field])) &&
+        ['goodForWork', 'goodForStudy', 'goodForDate', 'hasWifi', 'hasPowerOutlets']
+            .every((field) => isOptionalBoolean(body[field]))
+    );
+}
+
 router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedRequest, res) =>
 {
     try
@@ -63,21 +81,7 @@ router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedReq
         if (
             typeof googlePlaceId !== 'string' ||
             !isValidGooglePlaceId(googlePlaceId.trim()) ||
-            !Number.isInteger(rating) ||
-            rating < 1 ||
-            rating > 5 ||
-            typeof comment !== 'string' ||
-            comment.trim() === '' ||
-            !isOptionalRating(coffeeRating) ||
-            !isOptionalRating(foodRating) ||
-            !isOptionalRating(serviceRating) ||
-            !isOptionalRating(comfortRating) ||
-            !isOptionalRating(quietRating) ||
-            !isOptionalBoolean(goodForWork) ||
-            !isOptionalBoolean(goodForStudy) ||
-            !isOptionalBoolean(goodForDate) ||
-            !isOptionalBoolean(hasWifi) ||
-            !isOptionalBoolean(hasPowerOutlets) ||
+            !hasValidReviewContent(req.body) ||
             (
                 idempotencyKey !== undefined &&
                 (
@@ -260,6 +264,151 @@ router.post('/', requireAuth, limits.reviewsByUser, async (req: AuthenticatedReq
         return res.status(500).json({
             error: 'No se pudo crear la reseña',
         });
+    }
+});
+
+/*
+ * Una edición dentro de este tiempo desde la publicación no marca la
+ * reseña como editada: casi siempre es corregir algo recién escrito.
+ */
+export const EDIT_GRACE_PERIOD_MS = 15 * 60 * 1000;
+
+const REVIEW_NOT_FOUND_MESSAGE = 'No encontramos esa reseña.';
+
+/*
+ * La reseña de :id si es del usuario. Una reseña ajena y una inexistente
+ * dan lo mismo (null → 404), así no se revela cuáles existen.
+ */
+async function findOwnReview(rawId: unknown, userId: number)
+{
+    const id = Number(rawId);
+
+    if (!Number.isSafeInteger(id) || id <= 0 || String(id) !== rawId)
+    {
+        return null;
+    }
+
+    const review = await prisma.review.findUnique({ where: { id } });
+
+    return review && review.userId === userId ? review : null;
+}
+
+const isRecordNotFound = (error: unknown) =>
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2025';
+
+router.patch('/:id', requireAuth, limits.reviewChangesByUser, async (req: AuthenticatedRequest, res) =>
+{
+    try
+    {
+        const userId = req.userId;
+
+        if (!userId)
+        {
+            return res.status(401).json({ error: 'Autenticación requerida' });
+        }
+
+        const review = await findOwnReview(req.params.id, userId);
+
+        if (!review)
+        {
+            return res.status(404).json({ error: REVIEW_NOT_FOUND_MESSAGE });
+        }
+
+        if (!hasValidReviewContent(req.body ?? {}))
+        {
+            return res.status(400).json({ error: 'Datos de reseña inválidos' });
+        }
+
+        const now = new Date();
+        const isPastGracePeriod =
+            now.getTime() - review.createdAt.getTime() > EDIT_GRACE_PERIOD_MS;
+
+        // Lo que no viene se borra: así se puede sacar un puntaje que
+        // se había puesto. El café y la fecha de publicación no cambian.
+        const body = req.body;
+
+        try
+        {
+            const updated = await prisma.review.update({
+                where: { id: review.id },
+                data: {
+                    rating: body.rating,
+                    comment: body.comment.trim(),
+                    coffeeRating: body.coffeeRating ?? null,
+                    foodRating: body.foodRating ?? null,
+                    serviceRating: body.serviceRating ?? null,
+                    comfortRating: body.comfortRating ?? null,
+                    quietRating: body.quietRating ?? null,
+                    goodForWork: body.goodForWork ?? null,
+                    goodForStudy: body.goodForStudy ?? null,
+                    goodForDate: body.goodForDate ?? null,
+                    hasWifi: body.hasWifi ?? null,
+                    hasPowerOutlets: body.hasPowerOutlets ?? null,
+                    editedAt: isPastGracePeriod ? now : review.editedAt,
+                },
+            });
+
+            return res.json(updated);
+        }
+        catch (error)
+        {
+            // Se borró entre la búsqueda y la edición.
+            if (isRecordNotFound(error))
+            {
+                return res.status(404).json({ error: REVIEW_NOT_FOUND_MESSAGE });
+            }
+
+            throw error;
+        }
+    }
+    catch (error)
+    {
+        console.error('Error al editar la reseña:', error);
+
+        return res.status(500).json({ error: 'No se pudo editar la reseña' });
+    }
+});
+
+router.delete('/:id', requireAuth, limits.reviewChangesByUser, async (req: AuthenticatedRequest, res) =>
+{
+    try
+    {
+        const userId = req.userId;
+
+        if (!userId)
+        {
+            return res.status(401).json({ error: 'Autenticación requerida' });
+        }
+
+        const review = await findOwnReview(req.params.id, userId);
+
+        if (!review)
+        {
+            return res.status(404).json({ error: REVIEW_NOT_FOUND_MESSAGE });
+        }
+
+        try
+        {
+            await prisma.review.delete({ where: { id: review.id } });
+        }
+        catch (error)
+        {
+            // Ya estaba borrada (por ejemplo, dos toques seguidos): el
+            // resultado es el que se pidió.
+            if (!isRecordNotFound(error))
+            {
+                throw error;
+            }
+        }
+
+        return res.status(204).end();
+    }
+    catch (error)
+    {
+        console.error('Error al borrar la reseña:', error);
+
+        return res.status(500).json({ error: 'No se pudo borrar la reseña' });
     }
 });
 
