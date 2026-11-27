@@ -19,6 +19,7 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 import SearchScreen from '../screens/SearchScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import MyReviewsScreen from '../screens/MyReviewsScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import DeleteAccountScreen from '../screens/DeleteAccountScreen';
@@ -74,6 +75,7 @@ export type AccountStackParamList = {
     AccountHome: undefined;
     EditProfile: undefined;
     ChangePassword: undefined;
+    MyReviews: undefined;
     DeleteAccount: undefined;
 };
 
@@ -119,6 +121,14 @@ function AccountNavigator()
                 component={ChangePasswordScreen}
                 options={{
                     title: 'Cambiar contraseña',
+                }}
+            />
+
+            <AccountStack.Screen
+                name="MyReviews"
+                component={MyReviewsScreen}
+                options={{
+                    title: 'Mis reseñas',
                 }}
             />
 
