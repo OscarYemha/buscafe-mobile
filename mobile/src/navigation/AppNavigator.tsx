@@ -24,6 +24,7 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import DeleteAccountScreen from '../screens/DeleteAccountScreen';
 import ChooseZoneScreen from '../screens/ChooseZoneScreen';
+import type { MyReview } from '../services/api';
 import { NearbyCafesProvider } from '../context/NearbyCafesContext';
 import { SearchAreaProvider } from '../context/SearchAreaContext';
 
@@ -45,6 +46,9 @@ export type RootStackParamlist = {
         cafeAddress: string;
         cafeLatitude: number;
         cafeLongitude: number;
+    };
+    EditReview: {
+        review: MyReview;
     };
     Login: {
         returnTo?: 'previous' | 'Home' | 'Account';
@@ -338,6 +342,14 @@ export default function AppNavigator()
                 component={AddReviewScreen}
                 options={{
                     title: 'Escribir reseña',
+                }}
+            />
+
+            <Stack.Screen
+                name="EditReview"
+                component={AddReviewScreen}
+                options={{
+                    title: 'Editar reseña',
                 }}
             />
 
