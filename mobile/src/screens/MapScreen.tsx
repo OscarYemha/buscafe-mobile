@@ -899,7 +899,7 @@ export default function MapScreen(
                                     />
                                 </View>
                                 <Text style={styles.popupAddress} numberOfLines={1}>
-                                    <Ionicons name="location" size={12} color="#7A6254" />
+                                    <Ionicons name="location" size={13} color="#5C4536" />
                                     {' '}{selectedCafe.shortAddress}
                                 </Text>
                                 {(selectedCafeStatus || selectedCafe.servesVegetarianFood === true) && (
@@ -914,10 +914,13 @@ export default function MapScreen(
                                                 ● {selectedCafeStatus.label}
                                             </Text>
                                         )}
-                                        <VegetarianBadge
-                                            servesVegetarianFood={selectedCafe.servesVegetarianFood}
-                                            compact
-                                        />
+                                        {/* A la derecha, alineada con el ícono de café de arriba. */}
+                                        <View style={styles.popupBadge}>
+                                            <VegetarianBadge
+                                                servesVegetarianFood={selectedCafe.servesVegetarianFood}
+                                                compact
+                                            />
+                                        </View>
                                     </View>
                                 )}
                                 <View style={styles.popupDivider} />
@@ -1121,7 +1124,7 @@ export default function MapScreen(
                                             <View style={styles.cafeBadge}>
                                                 <VegetarianBadge
                                                     servesVegetarianFood
-                                                    compact
+                                                    plain
                                                 />
                                             </View>
                                         )}
@@ -1222,7 +1225,7 @@ const styles = StyleSheet.create({
         color: '#4A2416',
     },
     popupCoffee: { marginLeft: 8 },
-    popupAddress: { marginTop: 5, color: '#7A6254', fontSize: 12 },
+    popupAddress: { marginTop: 5, color: '#5C4536', fontSize: 13, fontWeight: '500' },
     popupStatusRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -1231,6 +1234,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     popupStatus: { fontSize: 12, fontWeight: '700' },
+    popupBadge: { marginLeft: 'auto' },
     popupDivider: {
         height: 1,
         backgroundColor: '#E8D9C7',
@@ -1295,7 +1299,7 @@ const styles = StyleSheet.create({
     },
 
     listContainer: {
-        height: 200,
+        height: 240,
         backgroundColor: '#FFFDFC',
     },
 
@@ -1339,7 +1343,7 @@ const styles = StyleSheet.create({
     },
 
     cafeBadge: {
-        marginTop: 5,
+        marginTop: 3,
     },
 
     cafeDistance: {
