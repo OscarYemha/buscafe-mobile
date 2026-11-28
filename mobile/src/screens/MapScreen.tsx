@@ -914,10 +914,13 @@ export default function MapScreen(
                                                 ● {selectedCafeStatus.label}
                                             </Text>
                                         )}
-                                        <VegetarianBadge
-                                            servesVegetarianFood={selectedCafe.servesVegetarianFood}
-                                            compact
-                                        />
+                                        {/* A la derecha, alineada con el ícono de café de arriba. */}
+                                        <View style={styles.popupBadge}>
+                                            <VegetarianBadge
+                                                servesVegetarianFood={selectedCafe.servesVegetarianFood}
+                                                compact
+                                            />
+                                        </View>
                                     </View>
                                 )}
                                 <View style={styles.popupDivider} />
@@ -1231,6 +1234,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     popupStatus: { fontSize: 12, fontWeight: '700' },
+    popupBadge: { marginLeft: 'auto' },
     popupDivider: {
         height: 1,
         backgroundColor: '#E8D9C7',
